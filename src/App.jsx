@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 
 const STORAGE_KEY = "viraj_jobs_v1";
 const CONTACTS_KEY = "viraj_contacts_v1";
@@ -29,6 +29,78 @@ const PRIORITY_STYLES = {
   "🟢 Cold": { bg:"#DCFCE7", text:"#14532D" },
 };
 
+const RESPONSIVE_CSS = `
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Mono:wght@400;500&display=swap');
+  * { box-sizing: border-box; }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: #0F172A; }
+  ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+  input[type=date]::-webkit-calendar-picker-indicator { filter: invert(0.5); }
+  select option { background: #1E293B; }
+
+  /* Layout */
+  .app-wrap { background:#0F172A; min-height:100vh; font-family:'DM Mono',monospace; color:#E2E8F0; padding-bottom:60px; }
+  .header-bar { background:linear-gradient(135deg,#0F172A 0%,#1E1B4B 100%); border-bottom:1px solid #1E293B; }
+  .header-inner { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; padding:16px 20px; max-width:1100px; margin:0 auto; }
+  .header-title { font-family:'Syne',sans-serif; font-size:20px; font-weight:800; background:linear-gradient(90deg,#60A5FA,#A78BFA); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+  .header-sub { color:#475569; font-size:10px; letter-spacing:0.08em; margin-top:2px; }
+  .nav-group { display:flex; gap:8px; flex-wrap:wrap; }
+  .main-content { max-width:1100px; margin:0 auto; padding:20px; }
+
+  /* Stats */
+  .stats-row { display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap; }
+  .stat-card { flex:1; min-width:120px; background:#1E293B; border:1px solid #334155; border-radius:12px; padding:16px 18px; }
+
+  /* Filter bar */
+  .filter-row { display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; align-items:center; }
+  .search-input { background:#1E293B; border:1px solid #334155; color:#E2E8F0; border-radius:7px; padding:8px 12px; font-size:13px; outline:none; font-family:'DM Mono',monospace; width:200px; }
+
+  /* Form grids */
+  .form-grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .form-grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; }
+
+  /* Job card */
+  .job-card-body { display:flex; align-items:flex-start; gap:12px; }
+  .job-card-meta { display:flex; flex-direction:column; gap:6px; align-items:flex-end; min-width:180px; flex-shrink:0; }
+
+  /* Contact card */
+  .contact-card-body { display:flex; gap:12px; align-items:flex-start; }
+  .contact-card-meta { display:flex; flex-direction:column; gap:6px; align-items:flex-end; flex-shrink:0; }
+
+  /* Dashboard */
+  .dashboard-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+
+  /* Buttons */
+  .btn-add { background:linear-gradient(135deg,#2563EB,#7C3AED); border:none; color:#fff; border-radius:8px; padding:9px 18px; cursor:pointer; font-size:13px; font-weight:700; font-family:'Syne',sans-serif; white-space:nowrap; }
+  .btn-add-contact { background:linear-gradient(135deg,#059669,#0284C7); border:none; color:#fff; border-radius:8px; padding:9px 18px; cursor:pointer; font-size:13px; font-weight:700; font-family:'Syne',sans-serif; white-space:nowrap; }
+
+  /* ── Tablet ── */
+  @media (max-width:768px) {
+    .header-inner { padding:14px 14px; }
+    .main-content { padding:14px 12px; }
+    .form-grid-2, .form-grid-3 { grid-template-columns:1fr; }
+    .job-card-body { flex-wrap:wrap; }
+    .job-card-meta { align-items:flex-start; min-width:unset; width:100%; flex-direction:row; flex-wrap:wrap; }
+    .contact-card-body { flex-wrap:wrap; }
+    .contact-card-meta { align-items:flex-start; width:100%; flex-direction:row; flex-wrap:wrap; }
+    .dashboard-grid { grid-template-columns:1fr; }
+    .search-input { width:100%; }
+    .stat-card { min-width:calc(50% - 6px); }
+    .filter-row { gap:6px; }
+  }
+
+  /* ── Mobile ── */
+  @media (max-width:480px) {
+    .header-inner { padding:12px 10px; gap:8px; }
+    .main-content { padding:10px 8px; }
+    .stat-card { min-width:calc(50% - 4px); padding:12px 10px !important; }
+    .stat-card .stat-val { font-size:22px !important; }
+    .nav-group button { padding:6px 10px !important; font-size:11px !important; }
+    .btn-add, .btn-add-contact { font-size:12px; padding:8px 14px; }
+    .search-input { font-size:12px; }
+  }
+`;
+
 function today() {
   return new Date().toISOString().split("T")[0];
 }
@@ -39,8 +111,7 @@ function addDays(dateStr, n) {
 }
 function daysDiff(dateStr) {
   if (!dateStr) return null;
-  const diff = Math.round((new Date(dateStr) - new Date(today())) / 86400000);
-  return diff;
+  return Math.round((new Date(dateStr) - new Date(today())) / 86400000);
 }
 function daysSince(dateStr) {
   if (!dateStr) return null;
@@ -68,16 +139,15 @@ const emptyContact = () => ({
   followUp: addDays(today(), 7), status: "Not Contacted", notes: "",
 });
 
-function Select({ value, onChange, options, className = "" }) {
+function Select({ value, onChange, options }) {
   return (
     <select
       value={value}
       onChange={e => onChange(e.target.value)}
-      className={className}
       style={{
         background:"#0F172A", border:"1px solid #334155", color:"#E2E8F0",
         borderRadius:6, padding:"6px 10px", fontSize:13, cursor:"pointer",
-        outline:"none", fontFamily:"'DM Mono', monospace"
+        outline:"none", fontFamily:"'DM Mono', monospace", maxWidth:"100%", width:"100%"
       }}
     >
       {options.map(o => <option key={o} value={o}>{o}</option>)}
@@ -141,6 +211,16 @@ function Textarea({ value, onChange, placeholder, rows = 2 }) {
   );
 }
 
+function StatCard({ label, value, sub, color }) {
+  return (
+    <div className="stat-card">
+      <div className="stat-val" style={{ fontSize:26, fontWeight:800, color, fontFamily:"'Syne', sans-serif" }}>{value}</div>
+      <div style={{ fontSize:11, color:"#94A3B8", fontWeight:700, letterSpacing:"0.06em", textTransform:"uppercase", marginTop:2 }}>{label}</div>
+      {sub && <div style={{ fontSize:11, color:"#475569", marginTop:4 }}>{sub}</div>}
+    </div>
+  );
+}
+
 function QuickAddForm({ onAdd, onCancel, initial }) {
   const [form, setForm] = useState(initial || emptyJob());
   const set = k => v => {
@@ -151,21 +231,16 @@ function QuickAddForm({ onAdd, onCancel, initial }) {
     });
   };
 
-  const label = { color:"#94A3B8", fontSize:11, fontWeight:700, letterSpacing:"0.08em",
-    textTransform:"uppercase", marginBottom:3, display:"block" };
+  const label = { color:"#94A3B8", fontSize:11, fontWeight:700, letterSpacing:"0.08em", textTransform:"uppercase", marginBottom:3, display:"block" };
   const field = { marginBottom:12 };
 
   return (
-    <div style={{
-      background:"#1E293B", border:"1px solid #334155", borderRadius:12,
-      padding:24, marginBottom:24
-    }}>
-      <h3 style={{ color:"#F8FAFC", fontFamily:"'Syne', sans-serif", fontSize:18,
-        fontWeight:800, marginBottom:20, marginTop:0 }}>
+    <div style={{ background:"#1E293B", border:"1px solid #334155", borderRadius:12, padding:"20px 16px", marginBottom:24 }}>
+      <h3 style={{ color:"#F8FAFC", fontFamily:"'Syne', sans-serif", fontSize:16, fontWeight:800, marginBottom:20, marginTop:0 }}>
         {initial ? "✏️ Edit Application" : "➕ Add New Application"}
       </h3>
 
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+      <div className="form-grid-2">
         <div style={field}>
           <label style={label}>Company *</label>
           <Input value={form.company} onChange={set("company")} placeholder="e.g. OpenAI" />
@@ -181,13 +256,13 @@ function QuickAddForm({ onAdd, onCancel, initial }) {
         <Input value={form.url} onChange={set("url")} placeholder="Paste full URL — auto-shortened in tracker" />
       </div>
 
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:12 }}>
+      <div className="form-grid-3">
         <div style={field}>
           <label style={label}>Date Applied</label>
           <Input type="date" value={form.dateApplied} onChange={set("dateApplied")} />
         </div>
         <div style={field}>
-          <label style={label}>Follow-Up Date <span style={{color:"#3B82F6"}}>(auto)</span></label>
+          <label style={label}>Follow-Up <span style={{color:"#3B82F6"}}>(auto)</span></label>
           <Input type="date" value={form.followUp} onChange={set("followUp")} />
         </div>
         <div style={field}>
@@ -196,7 +271,7 @@ function QuickAddForm({ onAdd, onCancel, initial }) {
         </div>
       </div>
 
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:12 }}>
+      <div className="form-grid-3">
         <div style={field}>
           <label style={label}>Method</label>
           <Select value={form.method} onChange={set("method")} options={METHOD_OPTIONS} />
@@ -211,7 +286,7 @@ function QuickAddForm({ onAdd, onCancel, initial }) {
         </div>
       </div>
 
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+      <div className="form-grid-2">
         <div style={field}>
           <label style={label}>H-1B Sponsor?</label>
           <Select value={form.h1b} onChange={set("h1b")} options={H1B_OPTIONS} />
@@ -227,7 +302,7 @@ function QuickAddForm({ onAdd, onCancel, initial }) {
         <Textarea value={form.notes} onChange={set("notes")} placeholder="Interview questions, recruiter name, next steps…" />
       </div>
 
-      <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
+      <div style={{ display:"flex", gap:10, justifyContent:"flex-end", flexWrap:"wrap" }}>
         {onCancel && (
           <button onClick={onCancel} style={{
             background:"transparent", border:"1px solid #334155", color:"#94A3B8",
@@ -245,20 +320,6 @@ function QuickAddForm({ onAdd, onCancel, initial }) {
           {initial ? "Save Changes" : "Add Application ✓"}
         </button>
       </div>
-    </div>
-  );
-}
-
-function StatCard({ label, value, sub, color }) {
-  return (
-    <div style={{
-      background:"#1E293B", border:"1px solid #334155", borderRadius:12,
-      padding:"18px 20px", flex:1, minWidth:110
-    }}>
-      <div style={{ fontSize:28, fontWeight:800, color, fontFamily:"'Syne', sans-serif" }}>{value}</div>
-      <div style={{ fontSize:12, color:"#94A3B8", fontWeight:700, letterSpacing:"0.06em",
-        textTransform:"uppercase", marginTop:2 }}>{label}</div>
-      {sub && <div style={{ fontSize:11, color:"#475569", marginTop:4 }}>{sub}</div>}
     </div>
   );
 }
@@ -329,43 +390,24 @@ export default function App() {
       background: tab === id ? "linear-gradient(135deg,#2563EB,#7C3AED)" : "transparent",
       border: tab === id ? "none" : "1px solid #334155",
       color: tab === id ? "#fff" : "#94A3B8",
-      borderRadius:7, padding:"7px 18px", cursor:"pointer", fontSize:13,
-      fontWeight:700, fontFamily:"'Syne', sans-serif", transition:"all 0.15s"
+      borderRadius:7, padding:"7px 14px", cursor:"pointer", fontSize:12,
+      fontWeight:700, fontFamily:"'Syne', sans-serif", transition:"all 0.15s",
+      whiteSpace:"nowrap"
     }}>{label}</button>
   );
 
-  const bg = { background:"#0F172A", minHeight:"100vh", fontFamily:"'DM Mono', monospace",
-    color:"#E2E8F0", padding:"0 0 60px" };
-
   return (
-    <div style={bg}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Mono:wght@400;500&display=swap');
-        * { box-sizing: border-box; }
-        ::-webkit-scrollbar { width: 6px; } 
-        ::-webkit-scrollbar-track { background: #0F172A; }
-        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
-        input[type=date]::-webkit-calendar-picker-indicator { filter: invert(0.5); }
-        select option { background: #1E293B; }
-      `}</style>
+    <div className="app-wrap">
+      <style>{RESPONSIVE_CSS}</style>
 
       {/* Header */}
-      <div style={{
-        background:"linear-gradient(135deg,#0F172A 0%,#1E1B4B 100%)",
-        borderBottom:"1px solid #1E293B", padding:"20px 28px 16px"
-      }}>
-        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:12 }}>
+      <div className="header-bar">
+        <div className="header-inner">
           <div>
-            <div style={{ fontFamily:"'Syne', sans-serif", fontSize:22, fontWeight:800,
-              background:"linear-gradient(90deg,#60A5FA,#A78BFA)", WebkitBackgroundClip:"text",
-              WebkitTextFillColor:"transparent" }}>
-              Viraj's Job Hunt 2026
-            </div>
-            <div style={{ color:"#475569", fontSize:11, letterSpacing:"0.1em", marginTop:2 }}>
-              F1 OPT · CS @ Ohio University · May 2026
-            </div>
+            <div className="header-title">Viraj&apos;s Job Hunt 2026</div>
+            <div className="header-sub">F1 OPT · CS @ Ohio University · May 2026</div>
           </div>
-          <div style={{ display:"flex", gap:8 }}>
+          <div className="nav-group">
             {navBtn("apps","📋 Applications")}
             {navBtn("contacts","👥 Contacts")}
             {navBtn("dashboard","📊 Dashboard")}
@@ -373,45 +415,34 @@ export default function App() {
         </div>
       </div>
 
-      <div style={{ maxWidth:1100, margin:"0 auto", padding:"24px 20px" }}>
+      <div className="main-content">
 
         {/* APPLICATIONS TAB */}
         {tab === "apps" && (
           <>
-            {/* Stat row */}
-            <div style={{ display:"flex", gap:10, marginBottom:20, flexWrap:"wrap" }}>
+            <div className="stats-row">
               <StatCard label="Total Applied" value={stats.total} color="#60A5FA" />
-              <StatCard label="Active Pipeline" value={stats.active} color="#34D399" />
-              <StatCard label="Offers" value={stats.offers} color="#22C55E" sub={stats.offers > 0 ? "🎉 Congrats!" : ""} />
-              <StatCard label="🔴 Hot Leads" value={stats.hot} color="#F87171" />
-              <StatCard label="Follow-Ups Due" value={stats.followUps} color={stats.followUps > 0 ? "#FBBF24" : "#94A3B8"}
-                sub={stats.followUps > 0 ? "⚠️ Action needed" : "All clear"} />
+              <StatCard label="Active" value={stats.active} color="#34D399" />
+              <StatCard label="Offers" value={stats.offers} color="#22C55E" sub={stats.offers > 0 ? "🎉" : ""} />
+              <StatCard label="🔴 Hot" value={stats.hot} color="#F87171" />
+              <StatCard label="Follow-Ups" value={stats.followUps} color={stats.followUps > 0 ? "#FBBF24" : "#94A3B8"}
+                sub={stats.followUps > 0 ? "⚠️ Due" : "All clear"} />
             </div>
 
-            {/* Add button + filters */}
-            <div style={{ display:"flex", gap:10, marginBottom:16, flexWrap:"wrap", alignItems:"center" }}>
+            <div className="filter-row">
               <button
                 onClick={() => { setShowForm(!showForm); setEditJob(null); }}
-                style={{
-                  background:"linear-gradient(135deg,#2563EB,#7C3AED)", border:"none",
-                  color:"#fff", borderRadius:8, padding:"9px 20px", cursor:"pointer",
-                  fontSize:13, fontWeight:700, fontFamily:"'Syne', sans-serif"
-                }}
+                className="btn-add"
               >{showForm ? "✕ Cancel" : "➕ Add Application"}</button>
 
               <input value={search} onChange={e => setSearch(e.target.value)}
                 placeholder="🔍 Search company or role…"
-                style={{ background:"#1E293B", border:"1px solid #334155", color:"#E2E8F0",
-                  borderRadius:7, padding:"8px 12px", fontSize:13, outline:"none",
-                  fontFamily:"'DM Mono', monospace", width:220 }} />
+                className="search-input" />
 
-              <Select value={filterStatus} onChange={setFilterStatus}
-                options={["All", ...STATUS_OPTIONS]} />
-              <Select value={filterPriority} onChange={setFilterPriority}
-                options={["All", ...PRIORITY_OPTIONS]} />
+              <Select value={filterStatus} onChange={setFilterStatus} options={["All", ...STATUS_OPTIONS]} />
+              <Select value={filterPriority} onChange={setFilterPriority} options={["All", ...PRIORITY_OPTIONS]} />
             </div>
 
-            {/* Quick add form */}
             {showForm && !editJob && (
               <QuickAddForm onAdd={addJob} onCancel={() => setShowForm(false)} />
             )}
@@ -419,7 +450,6 @@ export default function App() {
               <QuickAddForm initial={editJob} onAdd={addJob} onCancel={() => setEditJob(null)} />
             )}
 
-            {/* Jobs list */}
             {filteredJobs.length === 0 && (
               <div style={{ textAlign:"center", color:"#334155", padding:"60px 20px", fontSize:14 }}>
                 {jobs.length === 0 ? "No applications yet — add your first one above! 🚀" : "No results for current filters."}
@@ -434,24 +464,22 @@ export default function App() {
 
                 return (
                   <div key={job.id} style={{
-                    background:"#1E293B", border:`1px solid ${fuOverdue ? "#F87171" : "#334155"}`,
-                    borderRadius:10, padding:"14px 18px",
-                    borderLeft: `4px solid ${fuOverdue ? "#EF4444" : job.priority === "🔴 Hot" ? "#EF4444" : job.priority === "🟡 Warm" ? "#F59E0B" : "#3B82F6"}`
+                    background:"#1E293B",
+                    border:`1px solid ${fuOverdue ? "#F87171" : "#334155"}`,
+                    borderRadius:10, padding:"12px 14px",
+                    borderLeft:`4px solid ${fuOverdue ? "#EF4444" : job.priority === "🔴 Hot" ? "#EF4444" : job.priority === "🟡 Warm" ? "#F59E0B" : "#3B82F6"}`
                   }}>
-                    <div style={{ display:"flex", alignItems:"flex-start", gap:12, flexWrap:"wrap" }}>
-                      <div style={{ flex:1, minWidth:200 }}>
+                    <div className="job-card-body">
+                      <div style={{ flex:1, minWidth:0 }}>
                         <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap", marginBottom:6 }}>
-                          <span style={{ fontFamily:"'Syne', sans-serif", fontWeight:800,
-                            fontSize:15, color:"#F8FAFC" }}>{job.company}</span>
+                          <span style={{ fontFamily:"'Syne', sans-serif", fontWeight:800, fontSize:14, color:"#F8FAFC" }}>{job.company}</span>
                           <PriorityBadge priority={job.priority} />
                           {fuOverdue && <Badge style={{background:"#FEE2E2",color:"#991B1B"}}>⚠️ Follow up!</Badge>}
                         </div>
                         <div style={{ color:"#94A3B8", fontSize:13, marginBottom:6 }}>{job.role}</div>
                         <div style={{ display:"flex", gap:8, flexWrap:"wrap", alignItems:"center" }}>
                           <StatusBadge status={job.status} />
-                          <Badge style={{background:"#1E293B",color:"#64748B",border:"1px solid #334155"}}>
-                            {job.resume}
-                          </Badge>
+                          <Badge style={{background:"#1E293B",color:"#64748B",border:"1px solid #334155"}}>{job.resume}</Badge>
                           {job.url && (
                             <a href={job.url} target="_blank" rel="noreferrer" style={{
                               color:"#60A5FA", fontSize:11, textDecoration:"none", fontFamily:"'DM Mono', monospace"
@@ -459,33 +487,30 @@ export default function App() {
                           )}
                         </div>
                         {job.notes && (
-                          <div style={{ color:"#64748B", fontSize:11, marginTop:8,
-                            background:"#0F172A", borderRadius:5, padding:"5px 8px" }}>
+                          <div style={{ color:"#64748B", fontSize:11, marginTop:8, background:"#0F172A", borderRadius:5, padding:"5px 8px" }}>
                             {job.notes}
                           </div>
                         )}
                       </div>
 
-                      <div style={{ display:"flex", flexDirection:"column", gap:6, alignItems:"flex-end", minWidth:180 }}>
+                      <div className="job-card-meta">
                         <Select value={job.status} onChange={v => updateStatus(job.id, v)} options={STATUS_OPTIONS} />
-                        <div style={{ color:"#475569", fontSize:11, textAlign:"right" }}>
+                        <div style={{ color:"#475569", fontSize:11 }}>
                           Applied {dSince === 0 ? "today" : `${dSince}d ago`} · {job.method}
                         </div>
                         {job.followUp && (
                           <div style={{ fontSize:11, color: fuOverdue ? "#F87171" : "#94A3B8" }}>
                             {fuOverdue
-                              ? `⚠️ Follow-up overdue by ${Math.abs(dFU)}d`
+                              ? `⚠️ ${Math.abs(dFU)}d overdue`
                               : dFU === 0 ? "⏰ Follow up today!"
                               : `Follow up in ${dFU}d`}
                           </div>
                         )}
                         <div style={{ display:"flex", gap:6 }}>
                           <button onClick={() => { setEditJob(job); setShowForm(false); window.scrollTo(0,0); }}
-                            style={{ background:"#0F172A", border:"1px solid #334155", color:"#94A3B8",
-                              borderRadius:5, padding:"4px 10px", cursor:"pointer", fontSize:11 }}>Edit</button>
+                            style={{ background:"#0F172A", border:"1px solid #334155", color:"#94A3B8", borderRadius:5, padding:"4px 10px", cursor:"pointer", fontSize:11 }}>Edit</button>
                           <button onClick={() => deleteJob(job.id)}
-                            style={{ background:"#0F172A", border:"1px solid #334155", color:"#F87171",
-                              borderRadius:5, padding:"4px 10px", cursor:"pointer", fontSize:11 }}>Delete</button>
+                            style={{ background:"#0F172A", border:"1px solid #334155", color:"#F87171", borderRadius:5, padding:"4px 10px", cursor:"pointer", fontSize:11 }}>Delete</button>
                         </div>
                       </div>
                     </div>
@@ -499,11 +524,9 @@ export default function App() {
         {/* CONTACTS TAB */}
         {tab === "contacts" && (
           <>
-            <div style={{ display:"flex", gap:10, marginBottom:16, alignItems:"center" }}>
+            <div className="filter-row">
               <button onClick={() => { setShowContactForm(!showContactForm); setEditContact(null); }}
-                style={{ background:"linear-gradient(135deg,#059669,#0284C7)", border:"none",
-                  color:"#fff", borderRadius:8, padding:"9px 20px", cursor:"pointer",
-                  fontSize:13, fontWeight:700, fontFamily:"'Syne', sans-serif" }}>
+                className="btn-add-contact">
                 {showContactForm ? "✕ Cancel" : "➕ Add Contact"}
               </button>
               <div style={{ color:"#475569", fontSize:12 }}>{contacts.length} contacts tracked</div>
@@ -525,33 +548,30 @@ export default function App() {
               )}
               {contacts.map(c => (
                 <div key={c.id} style={{
-                  background:"#1E293B", border:"1px solid #334155", borderRadius:10,
-                  padding:"14px 18px", display:"flex", gap:12, flexWrap:"wrap", alignItems:"flex-start"
+                  background:"#1E293B", border:"1px solid #334155", borderRadius:10, padding:"12px 14px"
                 }}>
-                  <div style={{ flex:1, minWidth:220 }}>
-                    <div style={{ fontFamily:"'Syne', sans-serif", fontWeight:800, fontSize:14,
-                      color:"#F8FAFC", marginBottom:4 }}>{c.name || "—"}</div>
-                    <div style={{ color:"#94A3B8", fontSize:12, marginBottom:6 }}>
-                      {c.role} @ <span style={{color:"#60A5FA"}}>{c.company}</span>
+                  <div className="contact-card-body">
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontFamily:"'Syne', sans-serif", fontWeight:800, fontSize:14, color:"#F8FAFC", marginBottom:4 }}>{c.name || "—"}</div>
+                      <div style={{ color:"#94A3B8", fontSize:12, marginBottom:6 }}>
+                        {c.role} @ <span style={{color:"#60A5FA"}}>{c.company}</span>
+                      </div>
+                      <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+                        <Badge style={{background:"#1E293B",border:"1px solid #334155",color:"#94A3B8"}}>{c.type}</Badge>
+                        {c.linkedin && <a href={c.linkedin} target="_blank" rel="noreferrer" style={{color:"#60A5FA",fontSize:11,textDecoration:"none"}}>🔗 LinkedIn</a>}
+                        {c.email && <span style={{color:"#94A3B8",fontSize:11}}>{c.email}</span>}
+                      </div>
+                      {c.notes && <div style={{color:"#475569",fontSize:11,marginTop:6}}>{c.notes}</div>}
                     </div>
-                    <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
-                      <Badge style={{background:"#1E293B",border:"1px solid #334155",color:"#94A3B8"}}>{c.type}</Badge>
-                      {c.linkedin && <a href={c.linkedin} target="_blank" rel="noreferrer"
-                        style={{color:"#60A5FA",fontSize:11,textDecoration:"none"}}>🔗 LinkedIn</a>}
-                      {c.email && <span style={{color:"#94A3B8",fontSize:11}}>{c.email}</span>}
-                    </div>
-                    {c.notes && <div style={{color:"#475569",fontSize:11,marginTop:6}}>{c.notes}</div>}
-                  </div>
-                  <div style={{ display:"flex", flexDirection:"column", gap:6, alignItems:"flex-end" }}>
-                    <ContactStatusBadge status={c.status} />
-                    <div style={{color:"#475569",fontSize:11}}>Reached out: {c.outreachDate}</div>
-                    <div style={{ display:"flex", gap:6 }}>
-                      <button onClick={() => { setEditContact(c); setShowContactForm(false); }}
-                        style={{ background:"#0F172A", border:"1px solid #334155", color:"#94A3B8",
-                          borderRadius:5, padding:"4px 10px", cursor:"pointer", fontSize:11 }}>Edit</button>
-                      <button onClick={() => deleteContact(c.id)}
-                        style={{ background:"#0F172A", border:"1px solid #334155", color:"#F87171",
-                          borderRadius:5, padding:"4px 10px", cursor:"pointer", fontSize:11 }}>Delete</button>
+                    <div className="contact-card-meta">
+                      <ContactStatusBadge status={c.status} />
+                      <div style={{color:"#475569",fontSize:11}}>Reached out: {c.outreachDate}</div>
+                      <div style={{ display:"flex", gap:6 }}>
+                        <button onClick={() => { setEditContact(c); setShowContactForm(false); }}
+                          style={{ background:"#0F172A", border:"1px solid #334155", color:"#94A3B8", borderRadius:5, padding:"4px 10px", cursor:"pointer", fontSize:11 }}>Edit</button>
+                        <button onClick={() => deleteContact(c.id)}
+                          style={{ background:"#0F172A", border:"1px solid #334155", color:"#F87171", borderRadius:5, padding:"4px 10px", cursor:"pointer", fontSize:11 }}>Delete</button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -571,13 +591,13 @@ export default function App() {
 
 function ContactStatusBadge({ status }) {
   const styles = {
-    "Not Contacted":       { bg:"#F1F5F9", text:"#475569" },
-    "Message Sent":        { bg:"#FEF9C3", text:"#92400E" },
-    "No Response":         { bg:"#FEE2E2", text:"#991B1B" },
-    "Responded ✅":        { bg:"#DCFCE7", text:"#14532D" },
+    "Not Contacted":        { bg:"#F1F5F9", text:"#475569" },
+    "Message Sent":         { bg:"#FEF9C3", text:"#92400E" },
+    "No Response":          { bg:"#FEE2E2", text:"#991B1B" },
+    "Responded ✅":         { bg:"#DCFCE7", text:"#14532D" },
     "Referral Submitted 🎯":{ bg:"#EDE9FE", text:"#5B21B6" },
-    "Meeting Scheduled":   { bg:"#DBEAFE", text:"#1E40AF" },
-    "Meeting Done":        { bg:"#DBEAFE", text:"#1E40AF" },
+    "Meeting Scheduled":    { bg:"#DBEAFE", text:"#1E40AF" },
+    "Meeting Done":         { bg:"#DBEAFE", text:"#1E40AF" },
   };
   const s = styles[status] || styles["Not Contacted"];
   return <Badge style={{ background: s.bg, color: s.text }}>{status}</Badge>;
@@ -586,17 +606,14 @@ function ContactStatusBadge({ status }) {
 function ContactForm({ initial, onAdd, onCancel }) {
   const [form, setForm] = useState(initial || emptyContact());
   const set = k => v => setForm(f => ({ ...f, [k]: v }));
-  const label = { color:"#94A3B8", fontSize:11, fontWeight:700, letterSpacing:"0.08em",
-    textTransform:"uppercase", marginBottom:3, display:"block" };
+  const label = { color:"#94A3B8", fontSize:11, fontWeight:700, letterSpacing:"0.08em", textTransform:"uppercase", marginBottom:3, display:"block" };
 
   return (
-    <div style={{ background:"#1E293B", border:"1px solid #334155", borderRadius:12,
-      padding:24, marginBottom:20 }}>
-      <h3 style={{ color:"#F8FAFC", fontFamily:"'Syne', sans-serif", fontSize:16,
-        fontWeight:800, marginBottom:16, marginTop:0 }}>
+    <div style={{ background:"#1E293B", border:"1px solid #334155", borderRadius:12, padding:"20px 16px", marginBottom:20 }}>
+      <h3 style={{ color:"#F8FAFC", fontFamily:"'Syne', sans-serif", fontSize:16, fontWeight:800, marginBottom:16, marginTop:0 }}>
         {initial ? "✏️ Edit Contact" : "➕ Add Contact"}
       </h3>
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+      <div className="form-grid-2">
         <div><label style={label}>Name</label><Input value={form.name} onChange={set("name")} placeholder="Full name" /></div>
         <div><label style={label}>Company</label><Input value={form.company} onChange={set("company")} placeholder="Company" /></div>
         <div><label style={label}>Their Role</label><Input value={form.role} onChange={set("role")} placeholder="e.g. Senior Recruiter" /></div>
@@ -610,12 +627,9 @@ function ContactForm({ initial, onAdd, onCancel }) {
         <label style={label}>Notes</label>
         <Textarea value={form.notes} onChange={set("notes")} placeholder="Met at career fair, OU alumni, offered referral…" />
       </div>
-      <div style={{ display:"flex", gap:8, justifyContent:"flex-end", marginTop:14 }}>
-        <button onClick={onCancel} style={{ background:"transparent", border:"1px solid #334155",
-          color:"#94A3B8", borderRadius:7, padding:"7px 18px", cursor:"pointer", fontSize:13 }}>Cancel</button>
-        <button onClick={() => onAdd(form)} style={{ background:"linear-gradient(135deg,#059669,#0284C7)",
-          border:"none", color:"#fff", borderRadius:7, padding:"7px 22px", cursor:"pointer",
-          fontSize:13, fontWeight:700, fontFamily:"'Syne', sans-serif" }}>
+      <div style={{ display:"flex", gap:8, justifyContent:"flex-end", marginTop:14, flexWrap:"wrap" }}>
+        <button onClick={onCancel} style={{ background:"transparent", border:"1px solid #334155", color:"#94A3B8", borderRadius:7, padding:"7px 18px", cursor:"pointer", fontSize:13 }}>Cancel</button>
+        <button onClick={() => onAdd(form)} style={{ background:"linear-gradient(135deg,#059669,#0284C7)", border:"none", color:"#fff", borderRadius:7, padding:"7px 22px", cursor:"pointer", fontSize:13, fontWeight:700, fontFamily:"'Syne', sans-serif" }}>
           {initial ? "Save" : "Add Contact ✓"}
         </button>
       </div>
@@ -635,18 +649,16 @@ function Dashboard({ jobs, contacts }) {
 
   return (
     <div>
-      <div style={{ display:"flex", gap:10, marginBottom:20, flexWrap:"wrap" }}>
+      <div className="stats-row">
         <StatCard label="Total Applied" value={jobs.length} color="#60A5FA" />
-        <StatCard label="Response Rate" value={`${responseRate}%`} color="#34D399"
-          sub="Industry avg: 5-10%" />
+        <StatCard label="Response Rate" value={`${responseRate}%`} color="#34D399" sub="Avg: 5-10%" />
         <StatCard label="Offers" value={jobs.filter(j=>j.status==="Offer").length} color="#22C55E" />
         <StatCard label="Contacts" value={contacts.length} color="#A78BFA" />
       </div>
 
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
+      <div className="dashboard-grid">
         <div style={{ background:"#1E293B", border:"1px solid #334155", borderRadius:12, padding:20 }}>
-          <div style={{ fontFamily:"'Syne', sans-serif", fontWeight:800, fontSize:14,
-            color:"#F8FAFC", marginBottom:14 }}>Status Breakdown</div>
+          <div style={{ fontFamily:"'Syne', sans-serif", fontWeight:800, fontSize:14, color:"#F8FAFC", marginBottom:14 }}>Status Breakdown</div>
           {byStatus.map(({ label, count }) => count > 0 && (
             <div key={label} style={{ marginBottom:8 }}>
               <div style={{ display:"flex", justifyContent:"space-between", marginBottom:3 }}>
@@ -654,20 +666,14 @@ function Dashboard({ jobs, contacts }) {
                 <span style={{ fontSize:11, fontWeight:700, color:"#E2E8F0" }}>{count}</span>
               </div>
               <div style={{ background:"#0F172A", borderRadius:4, height:6, overflow:"hidden" }}>
-                <div style={{
-                  height:"100%", borderRadius:4,
-                  width:`${(count/maxStatus)*100}%`,
-                  background: STATUS_STYLES[label]?.dot || "#3B82F6",
-                  transition:"width 0.3s"
-                }} />
+                <div style={{ height:"100%", borderRadius:4, width:`${(count/maxStatus)*100}%`, background: STATUS_STYLES[label]?.dot || "#3B82F6", transition:"width 0.3s" }} />
               </div>
             </div>
           ))}
         </div>
 
         <div style={{ background:"#1E293B", border:"1px solid #334155", borderRadius:12, padding:20 }}>
-          <div style={{ fontFamily:"'Syne', sans-serif", fontWeight:800, fontSize:14,
-            color:"#F8FAFC", marginBottom:14 }}>Application Method</div>
+          <div style={{ fontFamily:"'Syne', sans-serif", fontWeight:800, fontSize:14, color:"#F8FAFC", marginBottom:14 }}>Application Method</div>
           {byMethod.map(({ label, count }) => count > 0 && (
             <div key={label} style={{ marginBottom:8 }}>
               <div style={{ display:"flex", justifyContent:"space-between", marginBottom:3 }}>
@@ -675,12 +681,7 @@ function Dashboard({ jobs, contacts }) {
                 <span style={{ fontSize:11, fontWeight:700, color:"#E2E8F0" }}>{count}</span>
               </div>
               <div style={{ background:"#0F172A", borderRadius:4, height:6, overflow:"hidden" }}>
-                <div style={{
-                  height:"100%", borderRadius:4,
-                  width:`${(count/maxMethod)*100}%`,
-                  background:"linear-gradient(90deg,#2563EB,#7C3AED)",
-                  transition:"width 0.3s"
-                }} />
+                <div style={{ height:"100%", borderRadius:4, width:`${(count/maxMethod)*100}%`, background:"linear-gradient(90deg,#2563EB,#7C3AED)", transition:"width 0.3s" }} />
               </div>
             </div>
           ))}
@@ -688,13 +689,10 @@ function Dashboard({ jobs, contacts }) {
       </div>
 
       {jobs.filter(j => !["Offer","Rejected","Withdrew"].includes(j.status) && daysDiff(j.followUp) <= 0).length > 0 && (
-        <div style={{ background:"#1E293B", border:"1px solid #F87171", borderRadius:12,
-          padding:20, marginTop:16 }}>
-          <div style={{ fontFamily:"'Syne', sans-serif", fontWeight:800, fontSize:14,
-            color:"#F87171", marginBottom:12 }}>⚠️ Overdue Follow-Ups</div>
+        <div style={{ background:"#1E293B", border:"1px solid #F87171", borderRadius:12, padding:20, marginTop:16 }}>
+          <div style={{ fontFamily:"'Syne', sans-serif", fontWeight:800, fontSize:14, color:"#F87171", marginBottom:12 }}>⚠️ Overdue Follow-Ups</div>
           {jobs.filter(j => !["Offer","Rejected","Withdrew"].includes(j.status) && daysDiff(j.followUp) <= 0).map(j => (
-            <div key={j.id} style={{ display:"flex", justifyContent:"space-between",
-              padding:"8px 0", borderBottom:"1px solid #1E293B", fontSize:13 }}>
+            <div key={j.id} style={{ display:"flex", justifyContent:"space-between", padding:"8px 0", borderBottom:"1px solid #0F172A", fontSize:13, flexWrap:"wrap", gap:4 }}>
               <span style={{ color:"#E2E8F0" }}>{j.company} — {j.role}</span>
               <span style={{ color:"#F87171" }}>{Math.abs(daysDiff(j.followUp))}d overdue</span>
             </div>
