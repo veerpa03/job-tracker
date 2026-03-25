@@ -193,6 +193,78 @@ function Textarea({ value, onChange, placeholder, rows = 2 }) {
   );
 }
 
+function Autocomplete({ value, onChange, placeholder, suggestions = [] }) {
+  const [focused, setFocused] = useState(false);
+  const [filteredSuggestions, setFilteredSuggestions] = useState([]);
+
+  useEffect(() => {
+    if (value && focused) {
+      const filtered = suggestions
+        .filter(s => s.toLowerCase().includes(value.toLowerCase()))
+        .slice(0, 5); // Limit to 5 suggestions
+      setFilteredSuggestions(filtered);
+    } else {
+      setFilteredSuggestions([]);
+    }
+  }, [value, focused, suggestions]);
+
+  return (
+    <div style={{ position: "relative", width: "100%" }}>
+      <input
+        type="text"
+        value={value}
+        placeholder={placeholder}
+        onChange={e => onChange(e.target.value)}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setTimeout(() => setFocused(false), 200)}
+        style={{
+          background:"#0F172A", border:"1px solid #334155", color:"#E2E8F0",
+          borderRadius:6, padding:"7px 10px", fontSize:13, outline:"none",
+          fontFamily:"'DM Mono', monospace", width:"100%", boxSizing:"border-box"
+        }}
+      />
+      {filteredSuggestions.length > 0 && (
+        <div style={{
+          position: "absolute",
+          top: "100%",
+          left: 0,
+          right: 0,
+          background: "#1E293B",
+          border: "1px solid #334155",
+          borderRadius: 6,
+          marginTop: 4,
+          maxHeight: 200,
+          overflowY: "auto",
+          zIndex: 1000,
+          boxShadow: "0 4px 6px -1px rgba(0,0,0,0.3)"
+        }}>
+          {filteredSuggestions.map((suggestion, idx) => (
+            <div
+              key={idx}
+              onClick={() => {
+                onChange(suggestion);
+                setFocused(false);
+              }}
+              style={{
+                padding: "8px 12px",
+                cursor: "pointer",
+                fontSize: 13,
+                color: "#E2E8F0",
+                borderBottom: idx < filteredSuggestions.length - 1 ? "1px solid #334155" : "none",
+                transition: "background 0.15s"
+              }}
+              onMouseEnter={e => e.target.style.background = "#334155"}
+              onMouseLeave={e => e.target.style.background = "transparent"}
+            >
+              {suggestion}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function StatCard({ label, value, sub, color }) {
   return (
     <div className="stat-card">
@@ -544,6 +616,36 @@ export default function App() {
             {/* CONTACTS TAB */}
             {tab === "contacts" && (
               <>
+                <div className="stats-row">
+                  <StatCard
+                    label="Total Contacts"
+                    value={contacts.length}
+                    color="#A78BFA"
+                  />
+                  <StatCard
+                    label="Active Outreach"
+                    value={contacts.filter(c => !["No Response", "Meeting Done"].includes(c.status)).length}
+                    color="#34D399"
+                  />
+                  <StatCard
+                    label="Responded"
+                    value={contacts.filter(c => c.status === "Responded ✅").length}
+                    color="#22C55E"
+                  />
+                  <StatCard
+                    label="Follow-Ups Due"
+                    value={contacts.filter(c => {
+                      const d = daysDiff(c.followUp);
+                      return d !== null && d <= 0 && !["Meeting Done", "No Response"].includes(c.status);
+                    }).length}
+                    color="#FBBF24"
+                    sub={contacts.filter(c => {
+                      const d = daysDiff(c.followUp);
+                      return d !== null && d <= 0 && !["Meeting Done", "No Response"].includes(c.status);
+                    }).length > 0 ? "⚠️ Action needed" : "All clear"}
+                  />
+                </div>
+
                 <div className="filter-row">
                   <button onClick={() => { setShowContactForm(!showContactForm); setEditContact(null); }} className="btn-add-contact">
                     {showContactForm ? "✕ Cancel" : "➕ Add Contact"}
@@ -557,6 +659,7 @@ export default function App() {
                     onAdd={addContact}
                     onCancel={() => { setShowContactForm(false); setEditContact(null); }}
                     saving={saving}
+                    allContacts={contacts}
                   />
                 )}
 
@@ -566,34 +669,52 @@ export default function App() {
                       No contacts yet. Add recruiters, alumni, and hiring managers here!
                     </div>
                   )}
-                  {contacts.map(c => (
-                    <div key={c.id} style={{ background:"#1E293B", border:"1px solid #334155", borderRadius:10, padding:"12px 14px" }}>
-                      <div className="contact-card-body">
-                        <div style={{ flex:1, minWidth:0 }}>
-                          <div style={{ fontFamily:"'Syne', sans-serif", fontWeight:800, fontSize:14, color:"#F8FAFC", marginBottom:4 }}>{c.name || "—"}</div>
-                          <div style={{ color:"#94A3B8", fontSize:12, marginBottom:6 }}>
-                            {c.role} @ <span style={{color:"#60A5FA"}}>{c.company}</span>
+                  {contacts.map(c => {
+                    const dFU = daysDiff(c.followUp);
+                    const fuOverdue = dFU !== null && dFU <= 0 && !["Meeting Done", "No Response"].includes(c.status);
+                    return (
+                      <div key={c.id} style={{
+                        background:"#1E293B",
+                        border:`1px solid ${fuOverdue ? "#F87171" : "#334155"}`,
+                        borderRadius:10,
+                        padding:"12px 14px",
+                        borderLeft:`4px solid ${fuOverdue ? "#EF4444" : "#A78BFA"}`
+                      }}>
+                        <div className="contact-card-body">
+                          <div style={{ flex:1, minWidth:0 }}>
+                            <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap", marginBottom:4 }}>
+                              <span style={{ fontFamily:"'Syne', sans-serif", fontWeight:800, fontSize:14, color:"#F8FAFC" }}>{c.name || "—"}</span>
+                              {fuOverdue && <Badge style={{background:"#FEE2E2",color:"#991B1B"}}>⚠️ Follow up!</Badge>}
+                            </div>
+                            <div style={{ color:"#94A3B8", fontSize:12, marginBottom:6 }}>
+                              {c.role} @ <span style={{color:"#60A5FA"}}>{c.company}</span>
+                            </div>
+                            <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+                              <Badge style={{background:"#1E293B",border:"1px solid #334155",color:"#94A3B8"}}>{c.type}</Badge>
+                              {c.linkedin && <a href={c.linkedin} target="_blank" rel="noreferrer" style={{color:"#60A5FA",fontSize:11,textDecoration:"none"}}>🔗 LinkedIn</a>}
+                              {c.email && <span style={{color:"#94A3B8",fontSize:11}}>{c.email}</span>}
+                            </div>
+                            {c.notes && <div style={{color:"#475569",fontSize:11,marginTop:6}}>{c.notes}</div>}
                           </div>
-                          <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
-                            <Badge style={{background:"#1E293B",border:"1px solid #334155",color:"#94A3B8"}}>{c.type}</Badge>
-                            {c.linkedin && <a href={c.linkedin} target="_blank" rel="noreferrer" style={{color:"#60A5FA",fontSize:11,textDecoration:"none"}}>🔗 LinkedIn</a>}
-                            {c.email && <span style={{color:"#94A3B8",fontSize:11}}>{c.email}</span>}
-                          </div>
-                          {c.notes && <div style={{color:"#475569",fontSize:11,marginTop:6}}>{c.notes}</div>}
-                        </div>
-                        <div className="contact-card-meta">
-                          <ContactStatusBadge status={c.status} />
-                          <div style={{color:"#475569",fontSize:11}}>Reached out: {c.outreachDate}</div>
-                          <div style={{ display:"flex", gap:6 }}>
-                            <button onClick={() => { setEditContact(c); setShowContactForm(false); }}
-                              style={{ background:"#0F172A", border:"1px solid #334155", color:"#94A3B8", borderRadius:5, padding:"4px 10px", cursor:"pointer", fontSize:11 }}>Edit</button>
-                            <button onClick={() => deleteContact(c.id)}
-                              style={{ background:"#0F172A", border:"1px solid #334155", color:"#F87171", borderRadius:5, padding:"4px 10px", cursor:"pointer", fontSize:11 }}>Delete</button>
+                          <div className="contact-card-meta">
+                            <ContactStatusBadge status={c.status} />
+                            <div style={{color:"#475569",fontSize:11}}>Reached out: {c.outreachDate}</div>
+                            {c.followUp && (
+                              <div style={{ fontSize:11, color: fuOverdue ? "#F87171" : "#94A3B8" }}>
+                                {fuOverdue ? `⚠️ ${Math.abs(dFU)}d overdue` : dFU === 0 ? "⏰ Follow up today!" : `Follow up in ${dFU}d`}
+                              </div>
+                            )}
+                            <div style={{ display:"flex", gap:6 }}>
+                              <button onClick={() => { setEditContact(c); setShowContactForm(false); }}
+                                style={{ background:"#0F172A", border:"1px solid #334155", color:"#94A3B8", borderRadius:5, padding:"4px 10px", cursor:"pointer", fontSize:11 }}>Edit</button>
+                              <button onClick={() => deleteContact(c.id)}
+                                style={{ background:"#0F172A", border:"1px solid #334155", color:"#F87171", borderRadius:5, padding:"4px 10px", cursor:"pointer", fontSize:11 }}>Delete</button>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </>
             )}
@@ -625,10 +746,13 @@ function ContactStatusBadge({ status }) {
   return <Badge style={{ background: s.bg, color: s.text }}>{status}</Badge>;
 }
 
-function ContactForm({ initial, onAdd, onCancel, saving }) {
+function ContactForm({ initial, onAdd, onCancel, saving, allContacts = [] }) {
   const [form, setForm] = useState(initial || emptyContact());
   const set = k => v => setForm(f => ({ ...f, [k]: v }));
   const lbl = { color:"#94A3B8", fontSize:11, fontWeight:700, letterSpacing:"0.08em", textTransform:"uppercase", marginBottom:3, display:"block" };
+
+  // Get unique company names from existing contacts
+  const uniqueCompanies = [...new Set(allContacts.map(c => c.company).filter(Boolean))];
 
   return (
     <div style={{ background:"#1E293B", border:"1px solid #334155", borderRadius:12, padding:"20px 16px", marginBottom:20 }}>
@@ -637,7 +761,7 @@ function ContactForm({ initial, onAdd, onCancel, saving }) {
       </h3>
       <div className="form-grid-2">
         <div><label style={lbl}>Name</label><Input value={form.name} onChange={set("name")} placeholder="Full name" /></div>
-        <div><label style={lbl}>Company</label><Input value={form.company} onChange={set("company")} placeholder="Company" /></div>
+        <div><label style={lbl}>Company</label><Autocomplete value={form.company} onChange={set("company")} placeholder="Company" suggestions={uniqueCompanies} /></div>
         <div><label style={lbl}>Their Role</label><Input value={form.role} onChange={set("role")} placeholder="e.g. Senior Recruiter" /></div>
         <div><label style={lbl}>Type</label><Select value={form.type} onChange={set("type")} options={CONTACT_TYPE_OPTIONS} /></div>
         <div><label style={lbl}>LinkedIn</label><Input value={form.linkedin} onChange={set("linkedin")} placeholder="Profile URL" /></div>
@@ -711,11 +835,23 @@ function Dashboard({ jobs, contacts }) {
 
       {jobs.filter(j => !["Offer","Rejected","Withdrew"].includes(j.status) && daysDiff(j.followUp) <= 0).length > 0 && (
         <div style={{ background:"#1E293B", border:"1px solid #F87171", borderRadius:12, padding:20, marginTop:16 }}>
-          <div style={{ fontFamily:"'Syne', sans-serif", fontWeight:800, fontSize:14, color:"#F87171", marginBottom:12 }}>⚠️ Overdue Follow-Ups</div>
+          <div style={{ fontFamily:"'Syne', sans-serif", fontWeight:800, fontSize:14, color:"#F87171", marginBottom:12 }}>⚠️ Overdue Application Follow-Ups</div>
           {jobs.filter(j => !["Offer","Rejected","Withdrew"].includes(j.status) && daysDiff(j.followUp) <= 0).map(j => (
             <div key={j.id} style={{ display:"flex", justifyContent:"space-between", padding:"8px 0", borderBottom:"1px solid #0F172A", fontSize:13, flexWrap:"wrap", gap:4 }}>
               <span style={{ color:"#E2E8F0" }}>{j.company} — {j.role}</span>
               <span style={{ color:"#F87171" }}>{Math.abs(daysDiff(j.followUp))}d overdue</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {contacts.filter(c => !["Meeting Done", "No Response"].includes(c.status) && daysDiff(c.followUp) <= 0).length > 0 && (
+        <div style={{ background:"#1E293B", border:"1px solid #A78BFA", borderRadius:12, padding:20, marginTop:16 }}>
+          <div style={{ fontFamily:"'Syne', sans-serif", fontWeight:800, fontSize:14, color:"#A78BFA", marginBottom:12 }}>👥 Overdue Contact Follow-Ups</div>
+          {contacts.filter(c => !["Meeting Done", "No Response"].includes(c.status) && daysDiff(c.followUp) <= 0).map(c => (
+            <div key={c.id} style={{ display:"flex", justifyContent:"space-between", padding:"8px 0", borderBottom:"1px solid #0F172A", fontSize:13, flexWrap:"wrap", gap:4 }}>
+              <span style={{ color:"#E2E8F0" }}>{c.name} @ {c.company}</span>
+              <span style={{ color:"#A78BFA" }}>{Math.abs(daysDiff(c.followUp))}d overdue</span>
             </div>
           ))}
         </div>
