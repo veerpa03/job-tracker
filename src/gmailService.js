@@ -44,7 +44,9 @@ export async function initGoogleAPI() {
         await gapi.client.init({
           clientId: clientId,
           scope: GMAIL_SCOPES,
-          discoveryDocs: DISCOVERY_DOCS
+          discoveryDocs: DISCOVERY_DOCS,
+          ux_mode: 'popup', // Force popup mode instead of iframe
+          redirect_uri: window.location.origin
         });
 
         isGapiInitialized = true;
