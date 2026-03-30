@@ -10,6 +10,8 @@ const supabase = createClient(
 
 // OAuth2 configuration
 const SCOPES = [
+  'openid',
+  'email',
   'https://www.googleapis.com/auth/gmail.readonly',
   'https://www.googleapis.com/auth/gmail.send'
 ];
