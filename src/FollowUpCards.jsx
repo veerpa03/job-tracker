@@ -22,6 +22,7 @@ export default function FollowUpCards({ contacts, onSend, onSkip, onUpdateContac
   const [editedEmails, setEditedEmails] = useState({});
   const [attachments, setAttachments] = useState({});
   const [previousEmails, setPreviousEmails] = useState({}); // Store previous emails for threading
+  const [sentEmails, setSentEmails] = useState({}); // Track which emails have been sent
 
   // New: Selection screen
   const [showSelection, setShowSelection] = useState(true);
@@ -29,10 +30,47 @@ export default function FollowUpCards({ contacts, onSend, onSkip, onUpdateContac
   const [generating, setGenerating] = useState(false);
   const [generationProgress, setGenerationProgress] = useState(0);
   const [selectedContacts, setSelectedContacts] = useState([]);
+  const [sessionComplete, setSessionComplete] = useState(false);
 
   const currentContact = selectedContacts[currentIndex];
   const hasMore = currentIndex < selectedContacts.length - 1;
   const progress = selectedContacts.length > 0 ? ((currentIndex + 1) / selectedContacts.length) * 100 : 0;
+  const sentCount = Object.keys(sentEmails).length;
+  const totalCount = selectedContacts.length;
+
+  // Restore session on mount
+  useEffect(() => {
+    const savedSession = localStorage.getItem('followup_session');
+    if (savedSession) {
+      try {
+        const session = JSON.parse(savedSession);
+        setSelectedContacts(session.selectedContacts || []);
+        setGeneratedEmails(session.generatedEmails || {});
+        setEditedEmails(session.editedEmails || {});
+        setPreviousEmails(session.previousEmails || {});
+        setSentEmails(session.sentEmails || {});
+        setCurrentIndex(session.currentIndex || 0);
+        setShowSelection(false);
+      } catch (e) {
+        console.error('Failed to restore session:', e);
+      }
+    }
+  }, []);
+
+  // Save session whenever state changes
+  useEffect(() => {
+    if (selectedContacts.length > 0) {
+      const session = {
+        selectedContacts,
+        generatedEmails,
+        editedEmails,
+        previousEmails,
+        sentEmails,
+        currentIndex
+      };
+      localStorage.setItem('followup_session', JSON.stringify(session));
+    }
+  }, [selectedContacts, generatedEmails, editedEmails, previousEmails, sentEmails, currentIndex]);
 
   // Batch generate emails for selected contacts
   const handleBatchGenerate = async () => {
@@ -150,8 +188,18 @@ export default function FollowUpCards({ contacts, onSend, onSkip, onUpdateContac
       // Call parent send function
       await onSend(currentContact, emailBody, files, previousEmail);
 
-      // Move to next card
-      handleNext();
+      // Mark email as sent
+      setSentEmails(prev => ({ ...prev, [currentContact.id]: true }));
+
+      // Check if all emails sent
+      const newSentCount = Object.keys(sentEmails).length + 1;
+      if (newSentCount >= selectedContacts.length) {
+        // All emails sent! Show completion
+        setSessionComplete(true);
+      } else {
+        // Move to next card
+        handleNext();
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -165,6 +213,19 @@ export default function FollowUpCards({ contacts, onSend, onSkip, onUpdateContac
 
   const handleFileUpload = (contactId, files) => {
     setAttachments(prev => ({ ...prev, [contactId]: Array.from(files) }));
+  };
+
+  const clearSession = () => {
+    localStorage.removeItem('followup_session');
+    setShowSelection(true);
+    setCurrentIndex(0);
+    setSelectedContacts([]);
+    setGeneratedEmails({});
+    setEditedEmails({});
+    setAttachments({});
+    setPreviousEmails({});
+    setSentEmails({});
+    setSessionComplete(false);
   };
 
   const handleRegenerate = async () => {
@@ -190,9 +251,74 @@ export default function FollowUpCards({ contacts, onSend, onSkip, onUpdateContac
   // Selection Screen
   if (showSelection) {
     const quickOptions = [5, 10, 15, 20, contacts.length];
+    const hasInProgressSession = selectedContacts.length > 0 && sentCount < totalCount;
 
     return (
       <div style={{ maxWidth: 700, margin: "0 auto" }}>
+        {/* Resume Session Banner */}
+        {hasInProgressSession && (
+          <div style={{
+            background: "linear-gradient(135deg, #F59E0B, #EF4444)",
+            border: "2px solid #FBBF24",
+            borderRadius: 16,
+            padding: 20,
+            marginBottom: 24,
+            textAlign: "center"
+          }}>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>⚡</div>
+            <h3 style={{
+              fontFamily: "'Syne', sans-serif",
+              fontSize: 18,
+              fontWeight: 700,
+              color: "#fff",
+              marginBottom: 8
+            }}>
+              Session in Progress!
+            </h3>
+            <p style={{ color: "rgba(255,255,255,0.9)", fontSize: 14, marginBottom: 16 }}>
+              You have {sentCount} of {totalCount} follow-ups sent. Resume or start fresh?
+            </p>
+            <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
+              <button
+                onClick={() => setShowSelection(false)}
+                style={{
+                  background: "#fff",
+                  border: "none",
+                  color: "#DC2626",
+                  borderRadius: 8,
+                  padding: "10px 20px",
+                  fontSize: 14,
+                  fontWeight: 700,
+                  fontFamily: "'Syne', sans-serif",
+                  cursor: "pointer"
+                }}
+              >
+                ▶️ Resume Session
+              </button>
+              <button
+                onClick={() => {
+                  if (confirm(`Are you sure? You'll lose progress on ${totalCount - sentCount} unsent emails.`)) {
+                    clearSession();
+                  }
+                }}
+                style={{
+                  background: "transparent",
+                  border: "2px solid rgba(255,255,255,0.5)",
+                  color: "#fff",
+                  borderRadius: 8,
+                  padding: "10px 20px",
+                  fontSize: 14,
+                  fontWeight: 700,
+                  fontFamily: "'Syne', sans-serif",
+                  cursor: "pointer"
+                }}
+              >
+                🗑️ Start Fresh
+              </button>
+            </div>
+          </div>
+        )}
+
         <div style={{
           background: "#1E293B",
           border: "2px solid #334155",
@@ -459,6 +585,45 @@ export default function FollowUpCards({ contacts, onSend, onSkip, onUpdateContac
     );
   }
 
+  // Completion screen
+  if (sessionComplete) {
+    return (
+      <div style={{ maxWidth: 600, margin: "0 auto", textAlign: "center", padding: 60 }}>
+        <div style={{ fontSize: 80, marginBottom: 24 }}>🎉</div>
+        <h2 style={{
+          fontFamily: "'Syne', sans-serif",
+          fontSize: 32,
+          fontWeight: 800,
+          color: "#F8FAFC",
+          marginBottom: 16
+        }}>
+          All Follow-Ups Sent!
+        </h2>
+        <p style={{ color: "#94A3B8", fontSize: 16, marginBottom: 32, lineHeight: 1.6 }}>
+          You've successfully sent {totalCount} follow-up email{totalCount !== 1 ? 's' : ''}! 🚀
+          <br />
+          Keep up the great networking momentum!
+        </p>
+        <button
+          onClick={clearSession}
+          style={{
+            background: "linear-gradient(135deg, #059669, #0284C7)",
+            border: "none",
+            color: "#fff",
+            borderRadius: 10,
+            padding: "14px 28px",
+            fontSize: 16,
+            fontWeight: 700,
+            fontFamily: "'Syne', sans-serif",
+            cursor: "pointer"
+          }}
+        >
+          ✨ Start New Session
+        </button>
+      </div>
+    );
+  }
+
   const days = daysSince(currentContact.outreachDate);
   const emailText = editedEmails[currentContact.id] || generatedEmails[currentContact.id] || "";
   const currentAttachments = attachments[currentContact.id] || [];
@@ -466,18 +631,9 @@ export default function FollowUpCards({ contacts, onSend, onSkip, onUpdateContac
   return (
     <div style={{ maxWidth: 800, margin: "0 auto" }}>
       {/* Back Button */}
-      <div style={{ marginBottom: 16 }}>
+      <div style={{ marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <button
-          onClick={() => {
-            if (confirm("Go back to selection? Your progress will be lost.")) {
-              setShowSelection(true);
-              setCurrentIndex(0);
-              setSelectedContacts([]);
-              setGeneratedEmails({});
-              setEditedEmails({});
-              setAttachments({});
-            }
-          }}
+          onClick={() => setShowSelection(true)}
           style={{
             background: "transparent",
             border: "1px solid #334155",
@@ -503,7 +659,7 @@ export default function FollowUpCards({ contacts, onSend, onSkip, onUpdateContac
           fontSize: 13
         }}>
           <span>Follow-up {currentIndex + 1} of {selectedContacts.length}</span>
-          <span>{Math.round(progress)}%</span>
+          <span>{sentCount} sent • {Math.round(progress)}% complete</span>
         </div>
         <div style={{
           background: "#0F172A",
