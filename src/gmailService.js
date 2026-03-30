@@ -72,7 +72,13 @@ export async function signInWithGoogle() {
     await initGoogleAPI();
 
     const authInstance = gapi.auth2.getAuthInstance();
-    await authInstance.signIn();
+
+    // Use popup instead of iframe for better compatibility
+    const options = {
+      prompt: 'select_account' // Always show account picker
+    };
+
+    await authInstance.signIn(options);
 
     localStorage.setItem('gmail_connected', 'true');
 
@@ -82,7 +88,15 @@ export async function signInWithGoogle() {
     };
   } catch (error) {
     console.error('Error signing in:', error);
-    throw new Error('Failed to sign in with Google');
+
+    // More detailed error message
+    if (error.error === 'popup_closed_by_user') {
+      throw new Error('Sign-in popup was closed. Please try again.');
+    } else if (error.error === 'access_denied') {
+      throw new Error('Access denied. Make sure you are added as a test user in Google Cloud Console.');
+    } else {
+      throw new Error(`Failed to sign in: ${error.error || error.message || 'Unknown error'}`);
+    }
   }
 }
 
