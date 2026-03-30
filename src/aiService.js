@@ -4,7 +4,7 @@
 // ══════════════════════════════════════════════════════════════════════════════
 
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
-const DEFAULT_MODEL = "openai/gpt-oss-120b"; // Fast & free
+const DEFAULT_MODEL = "llama-3.1-8b-instant"; // 500K tokens/day, super fast!
 
 // Default prompt template (stored in localStorage, customizable)
 export const DEFAULT_PROMPT_TEMPLATE = `You are a professional job seeker writing a follow-up email.
