@@ -3,6 +3,9 @@
 .env.local
 .env.*.local
 
+# Password/secret files
+pass of subabase.txt
+
 # Logs
 logs
 *.log
@@ -29,3 +32,4 @@ dist-ssr
 *.sw?
 
 .vercel
+.env*.local

@@ -1,5 +1,8 @@
 import { useState, useEffect } from "react";
 import { supabase, jobToDb, dbToJob, contactToDb, dbToContact } from "./supabase";
+import FollowUpCards from "./FollowUpCards";
+import Settings from "./Settings";
+import { openEmailClient, downloadAttachments, getUpdatedContactData } from "./emailService";
 
 const STATUS_OPTIONS = ["Applied","Phone Screen","Technical Round","Take-Home","Onsite / Final","Offer","Rejected","No Response","Withdrew"];
 const METHOD_OPTIONS = ["Cold Apply","Referral","Alumni Network","Recruiter Outreach","Work at a Startup","Handshake","LinkedIn","Career Fair","Other"];
@@ -30,48 +33,48 @@ const PRIORITY_STYLES = {
 const RESPONSIVE_CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Mono:wght@400;500&display=swap');
   * { box-sizing: border-box; }
-  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar { width: 8px; }
   ::-webkit-scrollbar-track { background: #0F172A; }
-  ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
   input[type=date]::-webkit-calendar-picker-indicator { filter: invert(0.5); }
   select option { background: #1E293B; }
 
-  .app-wrap { background:#0F172A; min-height:100vh; font-family:'DM Mono',monospace; color:#E2E8F0; padding-bottom:60px; }
+  .app-wrap { background:#0F172A; min-height:100vh; font-family:'DM Mono',monospace; color:#E2E8F0; padding-bottom:60px; font-size:14px; }
   .header-bar { background:linear-gradient(135deg,#0F172A 0%,#1E1B4B 100%); border-bottom:1px solid #1E293B; }
-  .header-inner { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; padding:16px 20px; max-width:1100px; margin:0 auto; }
-  .header-title { font-family:'Syne',sans-serif; font-size:20px; font-weight:800; background:linear-gradient(90deg,#60A5FA,#A78BFA); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
-  .header-sub { color:#475569; font-size:10px; letter-spacing:0.08em; margin-top:2px; }
-  .nav-group { display:flex; gap:8px; flex-wrap:wrap; }
-  .main-content { max-width:1100px; margin:0 auto; padding:20px; }
+  .header-inner { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:14px; padding:20px 24px; max-width:1200px; margin:0 auto; }
+  .header-title { font-family:'Syne',sans-serif; font-size:24px; font-weight:800; background:linear-gradient(90deg,#60A5FA,#A78BFA); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+  .header-sub { color:#475569; font-size:11px; letter-spacing:0.08em; margin-top:4px; }
+  .nav-group { display:flex; gap:10px; flex-wrap:wrap; }
+  .main-content { max-width:1200px; margin:0 auto; padding:24px; }
 
-  .stats-row { display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap; }
-  .stat-card { flex:1; min-width:120px; background:#1E293B; border:1px solid #334155; border-radius:12px; padding:16px 18px; }
-  .filter-row { display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; align-items:center; }
-  .search-input { background:#1E293B; border:1px solid #334155; color:#E2E8F0; border-radius:7px; padding:8px 12px; font-size:13px; outline:none; font-family:'DM Mono',monospace; width:200px; }
+  .stats-row { display:flex; gap:14px; margin-bottom:24px; flex-wrap:wrap; }
+  .stat-card { flex:1; min-width:140px; background:#1E293B; border:1px solid #334155; border-radius:14px; padding:20px 22px; }
+  .filter-row { display:flex; gap:10px; margin-bottom:18px; flex-wrap:wrap; align-items:center; }
+  .search-input { background:#1E293B; border:1px solid #334155; color:#E2E8F0; border-radius:8px; padding:10px 14px; font-size:14px; outline:none; font-family:'DM Mono',monospace; width:220px; }
 
-  .form-grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-  .form-grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; }
+  .form-grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .form-grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; }
 
-  .job-card-body { display:flex; align-items:flex-start; gap:12px; }
-  .job-card-meta { display:flex; flex-direction:column; gap:6px; align-items:flex-end; min-width:180px; flex-shrink:0; }
+  .job-card-body { display:flex; align-items:flex-start; gap:16px; }
+  .job-card-meta { display:flex; flex-direction:column; gap:8px; align-items:flex-end; min-width:200px; flex-shrink:0; }
 
-  .contact-card-body { display:flex; gap:12px; align-items:flex-start; }
-  .contact-card-meta { display:flex; flex-direction:column; gap:6px; align-items:flex-end; flex-shrink:0; }
+  .contact-card-body { display:flex; gap:16px; align-items:flex-start; }
+  .contact-card-meta { display:flex; flex-direction:column; gap:8px; align-items:flex-end; flex-shrink:0; }
 
-  .dashboard-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .dashboard-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
 
-  .btn-add { background:linear-gradient(135deg,#2563EB,#7C3AED); border:none; color:#fff; border-radius:8px; padding:9px 18px; cursor:pointer; font-size:13px; font-weight:700; font-family:'Syne',sans-serif; white-space:nowrap; }
-  .btn-add-contact { background:linear-gradient(135deg,#059669,#0284C7); border:none; color:#fff; border-radius:8px; padding:9px 18px; cursor:pointer; font-size:13px; font-weight:700; font-family:'Syne',sans-serif; white-space:nowrap; }
+  .btn-add { background:linear-gradient(135deg,#2563EB,#7C3AED); border:none; color:#fff; border-radius:9px; padding:11px 22px; cursor:pointer; font-size:14px; font-weight:700; font-family:'Syne',sans-serif; white-space:nowrap; }
+  .btn-add-contact { background:linear-gradient(135deg,#059669,#0284C7); border:none; color:#fff; border-radius:9px; padding:11px 22px; cursor:pointer; font-size:14px; font-weight:700; font-family:'Syne',sans-serif; white-space:nowrap; }
 
-  .loading-wrap { display:flex; align-items:center; justify-content:center; padding:80px 20px; gap:12px; color:#475569; font-size:14px; }
-  .spinner { width:20px; height:20px; border:2px solid #334155; border-top-color:#60A5FA; border-radius:50%; animation:spin 0.7s linear infinite; }
+  .loading-wrap { display:flex; align-items:center; justify-content:center; padding:80px 20px; gap:14px; color:#475569; font-size:15px; }
+  .spinner { width:24px; height:24px; border:3px solid #334155; border-top-color:#60A5FA; border-radius:50%; animation:spin 0.7s linear infinite; }
   @keyframes spin { to { transform:rotate(360deg); } }
 
-  .error-banner { background:#FEE2E2; border:1px solid #F87171; border-radius:8px; padding:12px 16px; color:#991B1B; font-size:13px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .error-banner { background:#FEE2E2; border:1px solid #F87171; border-radius:10px; padding:14px 18px; color:#991B1B; font-size:14px; margin-bottom:18px; display:flex; justify-content:space-between; align-items:center; gap:10px; }
 
   @media (max-width:768px) {
-    .header-inner { padding:14px 14px; }
-    .main-content { padding:14px 12px; }
+    .header-inner { padding:18px 16px; }
+    .main-content { padding:18px 14px; }
     .form-grid-2, .form-grid-3 { grid-template-columns:1fr; }
     .job-card-body { flex-wrap:wrap; }
     .job-card-meta { align-items:flex-start; min-width:unset; width:100%; flex-direction:row; flex-wrap:wrap; }
@@ -79,18 +82,18 @@ const RESPONSIVE_CSS = `
     .contact-card-meta { align-items:flex-start; width:100%; flex-direction:row; flex-wrap:wrap; }
     .dashboard-grid { grid-template-columns:1fr; }
     .search-input { width:100%; }
-    .stat-card { min-width:calc(50% - 6px); }
-    .filter-row { gap:6px; }
+    .stat-card { min-width:calc(50% - 8px); }
+    .filter-row { gap:8px; }
   }
 
   @media (max-width:480px) {
-    .header-inner { padding:12px 10px; gap:8px; }
-    .main-content { padding:10px 8px; }
-    .stat-card { min-width:calc(50% - 4px); padding:12px 10px !important; }
-    .stat-card .stat-val { font-size:22px !important; }
-    .nav-group button { padding:6px 10px !important; font-size:11px !important; }
-    .btn-add, .btn-add-contact { font-size:12px; padding:8px 14px; }
-    .search-input { font-size:12px; }
+    .header-inner { padding:14px 12px; gap:10px; }
+    .main-content { padding:14px 10px; }
+    .stat-card { min-width:calc(50% - 6px); padding:16px 14px !important; }
+    .stat-card .stat-val { font-size:24px !important; }
+    .nav-group button { padding:8px 12px !important; font-size:12px !important; }
+    .btn-add, .btn-add-contact { font-size:13px; padding:10px 16px; }
+    .search-input { font-size:13px; }
   }
 `;
 
@@ -138,7 +141,7 @@ function Select({ value, onChange, options }) {
   return (
     <select value={value} onChange={e => onChange(e.target.value)} style={{
       background:"#0F172A", border:"1px solid #334155", color:"#E2E8F0",
-      borderRadius:6, padding:"6px 10px", fontSize:13, cursor:"pointer",
+      borderRadius:7, padding:"8px 12px", fontSize:14, cursor:"pointer",
       outline:"none", fontFamily:"'DM Mono', monospace", maxWidth:"100%", width:"100%"
     }}>
       {options.map(o => <option key={o} value={o}>{o}</option>)}
@@ -149,8 +152,8 @@ function Select({ value, onChange, options }) {
 function Badge({ children, style }) {
   return (
     <span style={{
-      display:"inline-flex", alignItems:"center", gap:5,
-      padding:"3px 10px", borderRadius:99, fontSize:11, fontWeight:700,
+      display:"inline-flex", alignItems:"center", gap:6,
+      padding:"4px 12px", borderRadius:99, fontSize:12, fontWeight:700,
       letterSpacing:"0.03em", ...style
     }}>{children}</span>
   );
@@ -176,7 +179,7 @@ function Input({ value, onChange, placeholder, type = "text", style = {} }) {
     <input type={type} value={value} placeholder={placeholder}
       onChange={e => onChange(e.target.value)} style={{
         background:"#0F172A", border:"1px solid #334155", color:"#E2E8F0",
-        borderRadius:6, padding:"7px 10px", fontSize:13, outline:"none",
+        borderRadius:7, padding:"9px 12px", fontSize:14, outline:"none",
         fontFamily:"'DM Mono', monospace", width:"100%", boxSizing:"border-box", ...style
       }} />
   );
@@ -187,7 +190,7 @@ function Textarea({ value, onChange, placeholder, rows = 2 }) {
     <textarea value={value} placeholder={placeholder} rows={rows}
       onChange={e => onChange(e.target.value)} style={{
         background:"#0F172A", border:"1px solid #334155", color:"#E2E8F0",
-        borderRadius:6, padding:"7px 10px", fontSize:13, outline:"none",
+        borderRadius:7, padding:"9px 12px", fontSize:14, outline:"none",
         fontFamily:"'DM Mono', monospace", width:"100%", boxSizing:"border-box", resize:"vertical"
       }} />
   );
@@ -219,7 +222,7 @@ function Autocomplete({ value, onChange, placeholder, suggestions = [] }) {
         onBlur={() => setTimeout(() => setFocused(false), 200)}
         style={{
           background:"#0F172A", border:"1px solid #334155", color:"#E2E8F0",
-          borderRadius:6, padding:"7px 10px", fontSize:13, outline:"none",
+          borderRadius:7, padding:"9px 12px", fontSize:14, outline:"none",
           fontFamily:"'DM Mono', monospace", width:"100%", boxSizing:"border-box"
         }}
       />
@@ -231,9 +234,9 @@ function Autocomplete({ value, onChange, placeholder, suggestions = [] }) {
           right: 0,
           background: "#1E293B",
           border: "1px solid #334155",
-          borderRadius: 6,
-          marginTop: 4,
-          maxHeight: 200,
+          borderRadius: 8,
+          marginTop: 6,
+          maxHeight: 220,
           overflowY: "auto",
           zIndex: 1000,
           boxShadow: "0 4px 6px -1px rgba(0,0,0,0.3)"
@@ -246,9 +249,9 @@ function Autocomplete({ value, onChange, placeholder, suggestions = [] }) {
                 setFocused(false);
               }}
               style={{
-                padding: "8px 12px",
+                padding: "10px 14px",
                 cursor: "pointer",
-                fontSize: 13,
+                fontSize: 14,
                 color: "#E2E8F0",
                 borderBottom: idx < filteredSuggestions.length - 1 ? "1px solid #334155" : "none",
                 transition: "background 0.15s"
@@ -268,9 +271,9 @@ function Autocomplete({ value, onChange, placeholder, suggestions = [] }) {
 function StatCard({ label, value, sub, color }) {
   return (
     <div className="stat-card">
-      <div className="stat-val" style={{ fontSize:26, fontWeight:800, color, fontFamily:"'Syne', sans-serif" }}>{value}</div>
-      <div style={{ fontSize:11, color:"#94A3B8", fontWeight:700, letterSpacing:"0.06em", textTransform:"uppercase", marginTop:2 }}>{label}</div>
-      {sub && <div style={{ fontSize:11, color:"#475569", marginTop:4 }}>{sub}</div>}
+      <div className="stat-val" style={{ fontSize:30, fontWeight:800, color, fontFamily:"'Syne', sans-serif" }}>{value}</div>
+      <div style={{ fontSize:12, color:"#94A3B8", fontWeight:700, letterSpacing:"0.06em", textTransform:"uppercase", marginTop:4 }}>{label}</div>
+      {sub && <div style={{ fontSize:12, color:"#475569", marginTop:5 }}>{sub}</div>}
     </div>
   );
 }
@@ -285,12 +288,12 @@ function QuickAddForm({ onAdd, onCancel, initial, saving }) {
     return next;
   });
 
-  const lbl = { color:"#94A3B8", fontSize:11, fontWeight:700, letterSpacing:"0.08em", textTransform:"uppercase", marginBottom:3, display:"block" };
-  const fld = { marginBottom:12 };
+  const lbl = { color:"#94A3B8", fontSize:12, fontWeight:700, letterSpacing:"0.08em", textTransform:"uppercase", marginBottom:5, display:"block" };
+  const fld = { marginBottom:14 };
 
   return (
-    <div style={{ background:"#1E293B", border:"1px solid #334155", borderRadius:12, padding:"20px 16px", marginBottom:24 }}>
-      <h3 style={{ color:"#F8FAFC", fontFamily:"'Syne', sans-serif", fontSize:16, fontWeight:800, marginBottom:20, marginTop:0 }}>
+    <div style={{ background:"#1E293B", border:"1px solid #334155", borderRadius:14, padding:"24px 20px", marginBottom:26 }}>
+      <h3 style={{ color:"#F8FAFC", fontFamily:"'Syne', sans-serif", fontSize:18, fontWeight:800, marginBottom:22, marginTop:0 }}>
         {initial ? "✏️ Edit Application" : "➕ Add New Application"}
       </h3>
 
@@ -315,17 +318,17 @@ function QuickAddForm({ onAdd, onCancel, initial, saving }) {
       </div>
       <div style={fld}><label style={lbl}>Notes</label><Textarea value={form.notes} onChange={set("notes")} placeholder="Interview questions, recruiter name, next steps…" /></div>
 
-      <div style={{ display:"flex", gap:10, justifyContent:"flex-end", flexWrap:"wrap" }}>
+      <div style={{ display:"flex", gap:12, justifyContent:"flex-end", flexWrap:"wrap" }}>
         {onCancel && (
           <button onClick={onCancel} disabled={saving} style={{
             background:"transparent", border:"1px solid #334155", color:"#94A3B8",
-            borderRadius:7, padding:"8px 20px", cursor:"pointer", fontSize:13
+            borderRadius:8, padding:"10px 22px", cursor:"pointer", fontSize:14
           }}>Cancel</button>
         )}
         <button onClick={() => { if (form.company && form.role) onAdd(form); }} disabled={saving} style={{
           background:"linear-gradient(135deg,#2563EB,#7C3AED)", border:"none",
-          color:"#fff", borderRadius:7, padding:"8px 24px", cursor:saving?"not-allowed":"pointer",
-          fontSize:13, fontWeight:700, fontFamily:"'Syne', sans-serif", opacity:saving?0.7:1
+          color:"#fff", borderRadius:8, padding:"10px 26px", cursor:saving?"not-allowed":"pointer",
+          fontSize:14, fontWeight:700, fontFamily:"'Syne', sans-serif", opacity:saving?0.7:1
         }}>
           {saving ? "Saving…" : initial ? "Save Changes" : "Add Application ✓"}
         </button>
@@ -338,6 +341,7 @@ function QuickAddForm({ onAdd, onCancel, initial, saving }) {
 
 export default function App() {
   const [tab, setTab] = useState("apps");
+  const [emailSendSuccess, setEmailSendSuccess] = useState(false);
   const [jobs, setJobs] = useState([]);
   const [contacts, setContacts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -351,6 +355,14 @@ export default function App() {
   const [filterStatus, setFilterStatus] = useState("All");
   const [filterPriority, setFilterPriority] = useState("All");
   const [search, setSearch] = useState("");
+  const [contactsToShow, setContactsToShow] = useState(15); // Pagination for contacts
+
+  // Contact filters
+  const [contactSearch, setContactSearch] = useState("");
+  const [filterContactStatus, setFilterContactStatus] = useState("All");
+  const [filterContactType, setFilterContactType] = useState("All");
+  const [filterContactCompany, setFilterContactCompany] = useState("All");
+  const [filterFollowUp, setFilterFollowUp] = useState("All"); // All, Overdue, Upcoming, None
 
   // ── Load data from Supabase on mount ──────────────────────────────────────
   useEffect(() => {
@@ -425,6 +437,13 @@ export default function App() {
     setSaving(true);
     setError(null);
     try {
+      // Auto-update follow-up date when status changes to completed/active states
+      const activeStatuses = ["Responded ✅", "Meeting Scheduled", "Referral Submitted 🎯"];
+      if (editContact && activeStatuses.includes(form.status) && editContact.status !== form.status) {
+        // If status changed to an active state, set follow-up to 7 days from now
+        form.followUp = addDays(today(), 7);
+      }
+
       if (editContact) {
         const { error: e } = await supabase.from("contacts").update(contactToDb(form)).eq("id", editContact.id);
         if (e) throw e;
@@ -454,12 +473,88 @@ export default function App() {
     }
   };
 
+  // ── Follow-up Email Handlers ──────────────────────────────────────────────
+  const handleSendFollowUp = async (contact, emailBody, attachmentFiles) => {
+    setError(null);
+    try {
+      // Open email in default client
+      const result = openEmailClient(contact, emailBody, attachmentFiles);
+
+      if (result.warning) {
+        alert(result.warning);
+      }
+
+      // Download attachments if any
+      if (attachmentFiles.length > 0) {
+        downloadAttachments(attachmentFiles);
+      }
+
+      // Update contact in database
+      const updatedData = getUpdatedContactData();
+      const updatedContact = { ...contact, ...updatedData };
+
+      const { error: e } = await supabase.from("contacts").update(contactToDb(updatedContact)).eq("id", contact.id);
+      if (e) throw e;
+
+      setContacts(c => c.map(x => x.id === contact.id ? updatedContact : x));
+      setEmailSendSuccess(true);
+      setTimeout(() => setEmailSendSuccess(false), 3000);
+
+      return { success: true };
+    } catch (e) {
+      setError(e.message || "Failed to process follow-up.");
+      throw e;
+    }
+  };
+
+  const handleSkipFollowUp = (contact) => {
+    // Just skip, don't update anything
+    console.log("Skipped follow-up for", contact.name);
+  };
+
   // ── Derived state ─────────────────────────────────────────────────────────
   const filteredJobs = jobs.filter(j => {
     if (filterStatus !== "All" && j.status !== filterStatus) return false;
     if (filterPriority !== "All" && j.priority !== filterPriority) return false;
     if (search && !`${j.company} ${j.role}`.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
+  });
+
+  const filteredContacts = contacts.filter(c => {
+    if (filterContactStatus !== "All" && c.status !== filterContactStatus) return false;
+    if (filterContactType !== "All" && c.type !== filterContactType) return false;
+    if (filterContactCompany !== "All" && c.company !== filterContactCompany) return false;
+    if (contactSearch && !`${c.name} ${c.company} ${c.role}`.toLowerCase().includes(contactSearch.toLowerCase())) return false;
+
+    // Follow-up filter
+    if (filterFollowUp !== "All") {
+      const dFU = daysDiff(c.followUp);
+      const fuOverdue = dFU !== null && dFU <= 0 && !["Meeting Done", "No Response"].includes(c.status);
+      const fuUpcoming = dFU !== null && dFU > 0;
+      const noFollowUp = !c.followUp || c.followUp === "";
+
+      if (filterFollowUp === "Overdue" && !fuOverdue) return false;
+      if (filterFollowUp === "Upcoming" && !fuUpcoming) return false;
+      if (filterFollowUp === "None" && !noFollowUp) return false;
+    }
+
+    return true;
+  });
+
+  // Contacts that need follow-up (for Follow-Ups tab)
+  const contactsNeedingFollowUp = contacts.filter(c => {
+    // Must have email address
+    if (!c.email) return false;
+
+    // Must have sent a message before
+    if (c.status === "Not Contacted") return false;
+
+    // Ignore completed/dead statuses
+    if (["Meeting Done", "No Response", "Referral Submitted 🎯"].includes(c.status)) return false;
+
+    // Check if follow-up is overdue or due today
+    const dFU = daysDiff(c.followUp);
+    return dFU !== null && dFU <= 0;
   });
 
   const stats = {
@@ -478,7 +573,7 @@ export default function App() {
       background: tab === id ? "linear-gradient(135deg,#2563EB,#7C3AED)" : "transparent",
       border: tab === id ? "none" : "1px solid #334155",
       color: tab === id ? "#fff" : "#94A3B8",
-      borderRadius:7, padding:"7px 14px", cursor:"pointer", fontSize:12,
+      borderRadius:8, padding:"9px 16px", cursor:"pointer", fontSize:13,
       fontWeight:700, fontFamily:"'Syne', sans-serif", transition:"all 0.15s", whiteSpace:"nowrap"
     }}>{label}</button>
   );
@@ -497,7 +592,9 @@ export default function App() {
           <div className="nav-group">
             {navBtn("apps","📋 Applications")}
             {navBtn("contacts","👥 Contacts")}
+            {navBtn("followups",`📧 Follow-Ups${contactsNeedingFollowUp.length > 0 ? ` (${contactsNeedingFollowUp.length})` : ""}`)}
             {navBtn("dashboard","📊 Dashboard")}
+            {navBtn("settings","⚙️ Settings")}
           </div>
         </div>
       </div>
@@ -547,7 +644,7 @@ export default function App() {
                 )}
 
                 {filteredJobs.length === 0 && (
-                  <div style={{ textAlign:"center", color:"#334155", padding:"60px 20px", fontSize:14 }}>
+                  <div style={{ textAlign:"center", color:"#334155", padding:"60px 20px", fontSize:15 }}>
                     {jobs.length === 0 ? "No applications yet — add your first one above! 🚀" : "No results for current filters."}
                   </div>
                 )}
@@ -561,17 +658,17 @@ export default function App() {
                       <div key={job.id} style={{
                         background:"#1E293B",
                         border:`1px solid ${fuOverdue ? "#F87171" : "#334155"}`,
-                        borderRadius:10, padding:"12px 14px",
+                        borderRadius:12, padding:"16px 18px",
                         borderLeft:`4px solid ${fuOverdue ? "#EF4444" : job.priority === "🔴 Hot" ? "#EF4444" : job.priority === "🟡 Warm" ? "#F59E0B" : "#3B82F6"}`
                       }}>
                         <div className="job-card-body">
                           <div style={{ flex:1, minWidth:0 }}>
-                            <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap", marginBottom:6 }}>
-                              <span style={{ fontFamily:"'Syne', sans-serif", fontWeight:800, fontSize:14, color:"#F8FAFC" }}>{job.company}</span>
+                            <div style={{ display:"flex", alignItems:"center", gap:10, flexWrap:"wrap", marginBottom:8 }}>
+                              <span style={{ fontFamily:"'Syne', sans-serif", fontWeight:800, fontSize:16, color:"#F8FAFC" }}>{job.company}</span>
                               <PriorityBadge priority={job.priority} />
                               {fuOverdue && <Badge style={{background:"#FEE2E2",color:"#991B1B"}}>⚠️ Follow up!</Badge>}
                             </div>
-                            <div style={{ color:"#94A3B8", fontSize:13, marginBottom:6 }}>{job.role}</div>
+                            <div style={{ color:"#94A3B8", fontSize:14, marginBottom:8 }}>{job.role}</div>
                             <div style={{ display:"flex", gap:8, flexWrap:"wrap", alignItems:"center" }}>
                               <StatusBadge status={job.status} />
                               <Badge style={{background:"#1E293B",color:"#64748B",border:"1px solid #334155"}}>{job.resume}</Badge>
@@ -582,7 +679,7 @@ export default function App() {
                               )}
                             </div>
                             {job.notes && (
-                              <div style={{ color:"#64748B", fontSize:11, marginTop:8, background:"#0F172A", borderRadius:5, padding:"5px 8px" }}>
+                              <div style={{ color:"#64748B", fontSize:13, marginTop:10, background:"#0F172A", borderRadius:6, padding:"8px 10px" }}>
                                 {job.notes}
                               </div>
                             )}
@@ -590,19 +687,19 @@ export default function App() {
 
                           <div className="job-card-meta">
                             <Select value={job.status} onChange={v => updateStatus(job.id, v)} options={STATUS_OPTIONS} />
-                            <div style={{ color:"#475569", fontSize:11 }}>
+                            <div style={{ color:"#475569", fontSize:12 }}>
                               Applied {dSince === 0 ? "today" : `${dSince}d ago`} · {job.method}
                             </div>
                             {job.followUp && (
-                              <div style={{ fontSize:11, color: fuOverdue ? "#F87171" : "#94A3B8" }}>
+                              <div style={{ fontSize:12, color: fuOverdue ? "#F87171" : "#94A3B8" }}>
                                 {fuOverdue ? `⚠️ ${Math.abs(dFU)}d overdue` : dFU === 0 ? "⏰ Follow up today!" : `Follow up in ${dFU}d`}
                               </div>
                             )}
-                            <div style={{ display:"flex", gap:6 }}>
+                            <div style={{ display:"flex", gap:8 }}>
                               <button onClick={() => { setEditJob(job); setShowForm(false); window.scrollTo(0,0); }}
-                                style={{ background:"#0F172A", border:"1px solid #334155", color:"#94A3B8", borderRadius:5, padding:"4px 10px", cursor:"pointer", fontSize:11 }}>Edit</button>
+                                style={{ background:"#0F172A", border:"1px solid #334155", color:"#94A3B8", borderRadius:6, padding:"6px 12px", cursor:"pointer", fontSize:12 }}>Edit</button>
                               <button onClick={() => deleteJob(job.id)}
-                                style={{ background:"#0F172A", border:"1px solid #334155", color:"#F87171", borderRadius:5, padding:"4px 10px", cursor:"pointer", fontSize:11 }}>Delete</button>
+                                style={{ background:"#0F172A", border:"1px solid #334155", color:"#F87171", borderRadius:6, padding:"6px 12px", cursor:"pointer", fontSize:12 }}>Delete</button>
                             </div>
                           </div>
                         </div>
@@ -646,11 +743,80 @@ export default function App() {
                   />
                 </div>
 
-                <div className="filter-row">
+                <div style={{ marginBottom:20 }}>
                   <button onClick={() => { setShowContactForm(!showContactForm); setEditContact(null); }} className="btn-add-contact">
                     {showContactForm ? "✕ Cancel" : "➕ Add Contact"}
                   </button>
-                  <div style={{ color:"#475569", fontSize:12 }}>{contacts.length} contacts tracked</div>
+                </div>
+
+                <div style={{ background:"#1E293B", border:"1px solid #334155", borderRadius:12, padding:"20px", marginBottom:20 }}>
+                  <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16, flexWrap:"wrap", gap:10 }}>
+                    <h3 style={{ fontFamily:"'Syne', sans-serif", fontSize:16, fontWeight:800, color:"#F8FAFC", margin:0 }}>
+                      🔍 Filters
+                    </h3>
+                    {(contactSearch || filterContactStatus !== "All" || filterContactType !== "All" || filterContactCompany !== "All" || filterFollowUp !== "All") && (
+                      <button onClick={() => {
+                        setContactSearch("");
+                        setFilterContactStatus("All");
+                        setFilterContactType("All");
+                        setFilterContactCompany("All");
+                        setFilterFollowUp("All");
+                      }} style={{
+                        background:"transparent", border:"1px solid #334155", color:"#94A3B8",
+                        borderRadius:7, padding:"7px 14px", cursor:"pointer", fontSize:12,
+                        fontFamily:"'Syne', sans-serif", fontWeight:700
+                      }}>Clear All</button>
+                    )}
+                  </div>
+
+                  <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(200px, 1fr))", gap:14 }}>
+                    <div>
+                      <label style={{ display:"block", color:"#94A3B8", fontSize:11, fontWeight:700, letterSpacing:"0.08em", textTransform:"uppercase", marginBottom:6 }}>
+                        Search
+                      </label>
+                      <input value={contactSearch} onChange={e => setContactSearch(e.target.value)}
+                        placeholder="Name, company, role..."
+                        style={{
+                          background:"#0F172A", border:"1px solid #334155", color:"#E2E8F0",
+                          borderRadius:7, padding:"9px 12px", fontSize:14, outline:"none",
+                          fontFamily:"'DM Mono', monospace", width:"100%", boxSizing:"border-box"
+                        }} />
+                    </div>
+
+                    <div>
+                      <label style={{ display:"block", color:"#94A3B8", fontSize:11, fontWeight:700, letterSpacing:"0.08em", textTransform:"uppercase", marginBottom:6 }}>
+                        Status
+                      </label>
+                      <Select value={filterContactStatus} onChange={setFilterContactStatus} options={["All", ...CONTACT_STATUS_OPTIONS]} />
+                    </div>
+
+                    <div>
+                      <label style={{ display:"block", color:"#94A3B8", fontSize:11, fontWeight:700, letterSpacing:"0.08em", textTransform:"uppercase", marginBottom:6 }}>
+                        Type
+                      </label>
+                      <Select value={filterContactType} onChange={setFilterContactType} options={["All", ...CONTACT_TYPE_OPTIONS]} />
+                    </div>
+
+                    <div>
+                      <label style={{ display:"block", color:"#94A3B8", fontSize:11, fontWeight:700, letterSpacing:"0.08em", textTransform:"uppercase", marginBottom:6 }}>
+                        Company
+                      </label>
+                      <Select value={filterContactCompany} onChange={setFilterContactCompany}
+                        options={["All", ...[...new Set(contacts.map(c => c.company).filter(Boolean))].sort()]} />
+                    </div>
+
+                    <div>
+                      <label style={{ display:"block", color:"#94A3B8", fontSize:11, fontWeight:700, letterSpacing:"0.08em", textTransform:"uppercase", marginBottom:6 }}>
+                        Follow-Up
+                      </label>
+                      <Select value={filterFollowUp} onChange={setFilterFollowUp}
+                        options={["All", "Overdue", "Upcoming", "None"]} />
+                    </div>
+                  </div>
+
+                  <div style={{ marginTop:14, paddingTop:14, borderTop:"1px solid #334155", color:"#64748B", fontSize:13 }}>
+                    Showing <span style={{color:"#60A5FA", fontWeight:700}}>{filteredContacts.length}</span> of <span style={{color:"#E2E8F0", fontWeight:700}}>{contacts.length}</span> contacts
+                  </div>
                 </div>
 
                 {(showContactForm || editContact) && (
@@ -664,51 +830,56 @@ export default function App() {
                 )}
 
                 <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-                  {contacts.length === 0 && (
-                    <div style={{ textAlign:"center", color:"#334155", padding:"60px", fontSize:14 }}>
+                  {filteredContacts.length === 0 && contacts.length === 0 && (
+                    <div style={{ textAlign:"center", color:"#334155", padding:"60px", fontSize:15 }}>
                       No contacts yet. Add recruiters, alumni, and hiring managers here!
                     </div>
                   )}
-                  {contacts.map(c => {
+                  {filteredContacts.length === 0 && contacts.length > 0 && (
+                    <div style={{ textAlign:"center", color:"#334155", padding:"60px", fontSize:15 }}>
+                      No contacts match your filters. Try adjusting your search criteria.
+                    </div>
+                  )}
+                  {filteredContacts.slice(0, contactsToShow).map(c => {
                     const dFU = daysDiff(c.followUp);
                     const fuOverdue = dFU !== null && dFU <= 0 && !["Meeting Done", "No Response"].includes(c.status);
                     return (
                       <div key={c.id} style={{
                         background:"#1E293B",
                         border:`1px solid ${fuOverdue ? "#F87171" : "#334155"}`,
-                        borderRadius:10,
-                        padding:"12px 14px",
+                        borderRadius:12,
+                        padding:"16px 18px",
                         borderLeft:`4px solid ${fuOverdue ? "#EF4444" : "#A78BFA"}`
                       }}>
                         <div className="contact-card-body">
                           <div style={{ flex:1, minWidth:0 }}>
-                            <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap", marginBottom:4 }}>
-                              <span style={{ fontFamily:"'Syne', sans-serif", fontWeight:800, fontSize:14, color:"#F8FAFC" }}>{c.name || "—"}</span>
+                            <div style={{ display:"flex", alignItems:"center", gap:10, flexWrap:"wrap", marginBottom:6 }}>
+                              <span style={{ fontFamily:"'Syne', sans-serif", fontWeight:800, fontSize:16, color:"#F8FAFC" }}>{c.name || "—"}</span>
                               {fuOverdue && <Badge style={{background:"#FEE2E2",color:"#991B1B"}}>⚠️ Follow up!</Badge>}
                             </div>
-                            <div style={{ color:"#94A3B8", fontSize:12, marginBottom:6 }}>
+                            <div style={{ color:"#94A3B8", fontSize:14, marginBottom:8 }}>
                               {c.role} @ <span style={{color:"#60A5FA"}}>{c.company}</span>
                             </div>
-                            <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+                            <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
                               <Badge style={{background:"#1E293B",border:"1px solid #334155",color:"#94A3B8"}}>{c.type}</Badge>
-                              {c.linkedin && <a href={c.linkedin} target="_blank" rel="noreferrer" style={{color:"#60A5FA",fontSize:11,textDecoration:"none"}}>🔗 LinkedIn</a>}
-                              {c.email && <span style={{color:"#94A3B8",fontSize:11}}>{c.email}</span>}
+                              {c.linkedin && <a href={c.linkedin} target="_blank" rel="noreferrer" style={{color:"#60A5FA",fontSize:12,textDecoration:"none"}}>🔗 LinkedIn</a>}
+                              {c.email && <span style={{color:"#94A3B8",fontSize:12}}>{c.email}</span>}
                             </div>
-                            {c.notes && <div style={{color:"#475569",fontSize:11,marginTop:6}}>{c.notes}</div>}
+                            {c.notes && <div style={{color:"#475569",fontSize:13,marginTop:8}}>{c.notes}</div>}
                           </div>
                           <div className="contact-card-meta">
                             <ContactStatusBadge status={c.status} />
-                            <div style={{color:"#475569",fontSize:11}}>Reached out: {c.outreachDate}</div>
+                            <div style={{color:"#475569",fontSize:12}}>Reached out: {c.outreachDate}</div>
                             {c.followUp && (
-                              <div style={{ fontSize:11, color: fuOverdue ? "#F87171" : "#94A3B8" }}>
+                              <div style={{ fontSize:12, color: fuOverdue ? "#F87171" : "#94A3B8" }}>
                                 {fuOverdue ? `⚠️ ${Math.abs(dFU)}d overdue` : dFU === 0 ? "⏰ Follow up today!" : `Follow up in ${dFU}d`}
                               </div>
                             )}
-                            <div style={{ display:"flex", gap:6 }}>
+                            <div style={{ display:"flex", gap:8 }}>
                               <button onClick={() => { setEditContact(c); setShowContactForm(false); }}
-                                style={{ background:"#0F172A", border:"1px solid #334155", color:"#94A3B8", borderRadius:5, padding:"4px 10px", cursor:"pointer", fontSize:11 }}>Edit</button>
+                                style={{ background:"#0F172A", border:"1px solid #334155", color:"#94A3B8", borderRadius:6, padding:"6px 12px", cursor:"pointer", fontSize:12 }}>Edit</button>
                               <button onClick={() => deleteContact(c.id)}
-                                style={{ background:"#0F172A", border:"1px solid #334155", color:"#F87171", borderRadius:5, padding:"4px 10px", cursor:"pointer", fontSize:11 }}>Delete</button>
+                                style={{ background:"#0F172A", border:"1px solid #334155", color:"#F87171", borderRadius:6, padding:"6px 12px", cursor:"pointer", fontSize:12 }}>Delete</button>
                             </div>
                           </div>
                         </div>
@@ -716,12 +887,108 @@ export default function App() {
                     );
                   })}
                 </div>
+
+                {filteredContacts.length > contactsToShow && (
+                  <div style={{ display:"flex", justifyContent:"center", marginTop:20 }}>
+                    <button onClick={() => setContactsToShow(prev => prev + 15)}
+                      style={{
+                        background:"linear-gradient(135deg,#059669,#0284C7)", border:"none",
+                        color:"#fff", borderRadius:8, padding:"10px 24px", cursor:"pointer",
+                        fontSize:13, fontWeight:700, fontFamily:"'Syne', sans-serif"
+                      }}>
+                      Load More ({filteredContacts.length - contactsToShow} remaining)
+                    </button>
+                  </div>
+                )}
+
+                {filteredContacts.length > 15 && contactsToShow >= filteredContacts.length && (
+                  <div style={{ display:"flex", justifyContent:"center", marginTop:20 }}>
+                    <button onClick={() => setContactsToShow(15)}
+                      style={{
+                        background:"transparent", border:"1px solid #334155",
+                        color:"#94A3B8", borderRadius:8, padding:"10px 24px", cursor:"pointer",
+                        fontSize:13, fontWeight:700, fontFamily:"'Syne', sans-serif"
+                      }}>
+                      Show Less
+                    </button>
+                  </div>
+                )}
               </>
             )}
 
             {/* DASHBOARD TAB */}
             {tab === "dashboard" && (
               <Dashboard jobs={jobs} contacts={contacts} />
+            )}
+
+            {/* FOLLOW-UPS TAB */}
+            {tab === "followups" && (
+              <>
+                <div style={{ marginBottom: 24 }}>
+                  <h2 style={{
+                    fontFamily: "'Syne', sans-serif",
+                    fontSize: 28,
+                    fontWeight: 800,
+                    color: "#F8FAFC",
+                    marginBottom: 8
+                  }}>
+                    📧 Follow-Up Emails
+                  </h2>
+                  <p style={{ color: "#94A3B8", fontSize: 15, marginBottom: 20 }}>
+                    AI-generated follow-ups for contacts you've reached out to
+                  </p>
+
+                  {emailSendSuccess && (
+                    <div style={{
+                      background: "#DCFCE7",
+                      border: "1px solid #22C55E",
+                      color: "#14532D",
+                      padding: 14,
+                      borderRadius: 10,
+                      marginBottom: 20,
+                      fontSize: 14,
+                      fontWeight: 600
+                    }}>
+                      ✓ Email opened in your mail client! Contact updated.
+                    </div>
+                  )}
+                </div>
+
+                {contactsNeedingFollowUp.length === 0 ? (
+                  <div style={{
+                    background: "#1E293B",
+                    border: "1px solid #334155",
+                    borderRadius: 20,
+                    padding: 60,
+                    textAlign: "center"
+                  }}>
+                    <div style={{ fontSize: 64, marginBottom: 16 }}>✨</div>
+                    <h3 style={{
+                      fontFamily: "'Syne', sans-serif",
+                      fontSize: 22,
+                      fontWeight: 800,
+                      color: "#F8FAFC",
+                      marginBottom: 8
+                    }}>
+                      All Caught Up!
+                    </h3>
+                    <p style={{ color: "#94A3B8", fontSize: 15 }}>
+                      No follow-ups needed right now. Check back later!
+                    </p>
+                  </div>
+                ) : (
+                  <FollowUpCards
+                    contacts={contactsNeedingFollowUp}
+                    onSend={handleSendFollowUp}
+                    onSkip={handleSkipFollowUp}
+                  />
+                )}
+              </>
+            )}
+
+            {/* SETTINGS TAB */}
+            {tab === "settings" && (
+              <Settings />
             )}
           </>
         )}
@@ -749,14 +1016,14 @@ function ContactStatusBadge({ status }) {
 function ContactForm({ initial, onAdd, onCancel, saving, allContacts = [] }) {
   const [form, setForm] = useState(initial || emptyContact());
   const set = k => v => setForm(f => ({ ...f, [k]: v }));
-  const lbl = { color:"#94A3B8", fontSize:11, fontWeight:700, letterSpacing:"0.08em", textTransform:"uppercase", marginBottom:3, display:"block" };
+  const lbl = { color:"#94A3B8", fontSize:12, fontWeight:700, letterSpacing:"0.08em", textTransform:"uppercase", marginBottom:5, display:"block" };
 
   // Get unique company names from existing contacts
   const uniqueCompanies = [...new Set(allContacts.map(c => c.company).filter(Boolean))];
 
   return (
-    <div style={{ background:"#1E293B", border:"1px solid #334155", borderRadius:12, padding:"20px 16px", marginBottom:20 }}>
-      <h3 style={{ color:"#F8FAFC", fontFamily:"'Syne', sans-serif", fontSize:16, fontWeight:800, marginBottom:16, marginTop:0 }}>
+    <div style={{ background:"#1E293B", border:"1px solid #334155", borderRadius:14, padding:"24px 20px", marginBottom:22 }}>
+      <h3 style={{ color:"#F8FAFC", fontFamily:"'Syne', sans-serif", fontSize:18, fontWeight:800, marginBottom:18, marginTop:0 }}>
         {initial ? "✏️ Edit Contact" : "➕ Add Contact"}
       </h3>
       <div className="form-grid-2">
@@ -769,13 +1036,27 @@ function ContactForm({ initial, onAdd, onCancel, saving, allContacts = [] }) {
         <div><label style={lbl}>Outreach Date</label><Input type="date" value={form.outreachDate} onChange={set("outreachDate")} /></div>
         <div><label style={lbl}>Status</label><Select value={form.status} onChange={set("status")} options={CONTACT_STATUS_OPTIONS} /></div>
       </div>
-      <div style={{ marginTop:12 }}>
+      <div style={{ marginTop:14 }}>
+        <label style={lbl}>Follow-Up Date</label>
+        <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+          <Input type="date" value={form.followUp} onChange={set("followUp")} />
+          <button onClick={() => setForm(f => ({ ...f, followUp: addDays(today(), 7) }))} type="button"
+            style={{ background:"#334155", border:"none", color:"#94A3B8", borderRadius:6, padding:"9px 14px", cursor:"pointer", fontSize:12, whiteSpace:"nowrap" }}>
+            +7d
+          </button>
+          <button onClick={() => setForm(f => ({ ...f, followUp: "" }))} type="button"
+            style={{ background:"#334155", border:"none", color:"#F87171", borderRadius:6, padding:"9px 14px", cursor:"pointer", fontSize:12 }}>
+            Clear
+          </button>
+        </div>
+      </div>
+      <div style={{ marginTop:14 }}>
         <label style={lbl}>Notes</label>
         <Textarea value={form.notes} onChange={set("notes")} placeholder="Met at career fair, OU alumni, offered referral…" />
       </div>
-      <div style={{ display:"flex", gap:8, justifyContent:"flex-end", marginTop:14, flexWrap:"wrap" }}>
-        <button onClick={onCancel} disabled={saving} style={{ background:"transparent", border:"1px solid #334155", color:"#94A3B8", borderRadius:7, padding:"7px 18px", cursor:"pointer", fontSize:13 }}>Cancel</button>
-        <button onClick={() => onAdd(form)} disabled={saving} style={{ background:"linear-gradient(135deg,#059669,#0284C7)", border:"none", color:"#fff", borderRadius:7, padding:"7px 22px", cursor:saving?"not-allowed":"pointer", fontSize:13, fontWeight:700, fontFamily:"'Syne', sans-serif", opacity:saving?0.7:1 }}>
+      <div style={{ display:"flex", gap:10, justifyContent:"flex-end", marginTop:16, flexWrap:"wrap" }}>
+        <button onClick={onCancel} disabled={saving} style={{ background:"transparent", border:"1px solid #334155", color:"#94A3B8", borderRadius:8, padding:"9px 20px", cursor:"pointer", fontSize:14 }}>Cancel</button>
+        <button onClick={() => onAdd(form)} disabled={saving} style={{ background:"linear-gradient(135deg,#059669,#0284C7)", border:"none", color:"#fff", borderRadius:8, padding:"9px 24px", cursor:saving?"not-allowed":"pointer", fontSize:14, fontWeight:700, fontFamily:"'Syne', sans-serif", opacity:saving?0.7:1 }}>
           {saving ? "Saving…" : initial ? "Save" : "Add Contact ✓"}
         </button>
       </div>
@@ -802,31 +1083,31 @@ function Dashboard({ jobs, contacts }) {
       </div>
 
       <div className="dashboard-grid">
-        <div style={{ background:"#1E293B", border:"1px solid #334155", borderRadius:12, padding:20 }}>
-          <div style={{ fontFamily:"'Syne', sans-serif", fontWeight:800, fontSize:14, color:"#F8FAFC", marginBottom:14 }}>Status Breakdown</div>
+        <div style={{ background:"#1E293B", border:"1px solid #334155", borderRadius:14, padding:24 }}>
+          <div style={{ fontFamily:"'Syne', sans-serif", fontWeight:800, fontSize:16, color:"#F8FAFC", marginBottom:16 }}>Status Breakdown</div>
           {byStatus.map(({ label, count }) => count > 0 && (
-            <div key={label} style={{ marginBottom:8 }}>
-              <div style={{ display:"flex", justifyContent:"space-between", marginBottom:3 }}>
-                <span style={{ fontSize:11, color:"#94A3B8" }}>{label}</span>
-                <span style={{ fontSize:11, fontWeight:700, color:"#E2E8F0" }}>{count}</span>
+            <div key={label} style={{ marginBottom:10 }}>
+              <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
+                <span style={{ fontSize:13, color:"#94A3B8" }}>{label}</span>
+                <span style={{ fontSize:13, fontWeight:700, color:"#E2E8F0" }}>{count}</span>
               </div>
-              <div style={{ background:"#0F172A", borderRadius:4, height:6, overflow:"hidden" }}>
-                <div style={{ height:"100%", borderRadius:4, width:`${(count/maxStatus)*100}%`, background: STATUS_STYLES[label]?.dot || "#3B82F6", transition:"width 0.3s" }} />
+              <div style={{ background:"#0F172A", borderRadius:5, height:8, overflow:"hidden" }}>
+                <div style={{ height:"100%", borderRadius:5, width:`${(count/maxStatus)*100}%`, background: STATUS_STYLES[label]?.dot || "#3B82F6", transition:"width 0.3s" }} />
               </div>
             </div>
           ))}
         </div>
 
-        <div style={{ background:"#1E293B", border:"1px solid #334155", borderRadius:12, padding:20 }}>
-          <div style={{ fontFamily:"'Syne', sans-serif", fontWeight:800, fontSize:14, color:"#F8FAFC", marginBottom:14 }}>Application Method</div>
+        <div style={{ background:"#1E293B", border:"1px solid #334155", borderRadius:14, padding:24 }}>
+          <div style={{ fontFamily:"'Syne', sans-serif", fontWeight:800, fontSize:16, color:"#F8FAFC", marginBottom:16 }}>Application Method</div>
           {byMethod.map(({ label, count }) => count > 0 && (
-            <div key={label} style={{ marginBottom:8 }}>
-              <div style={{ display:"flex", justifyContent:"space-between", marginBottom:3 }}>
-                <span style={{ fontSize:11, color:"#94A3B8" }}>{label}</span>
-                <span style={{ fontSize:11, fontWeight:700, color:"#E2E8F0" }}>{count}</span>
+            <div key={label} style={{ marginBottom:10 }}>
+              <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
+                <span style={{ fontSize:13, color:"#94A3B8" }}>{label}</span>
+                <span style={{ fontSize:13, fontWeight:700, color:"#E2E8F0" }}>{count}</span>
               </div>
-              <div style={{ background:"#0F172A", borderRadius:4, height:6, overflow:"hidden" }}>
-                <div style={{ height:"100%", borderRadius:4, width:`${(count/maxMethod)*100}%`, background:"linear-gradient(90deg,#2563EB,#7C3AED)", transition:"width 0.3s" }} />
+              <div style={{ background:"#0F172A", borderRadius:5, height:8, overflow:"hidden" }}>
+                <div style={{ height:"100%", borderRadius:5, width:`${(count/maxMethod)*100}%`, background:"linear-gradient(90deg,#2563EB,#7C3AED)", transition:"width 0.3s" }} />
               </div>
             </div>
           ))}
@@ -834,10 +1115,10 @@ function Dashboard({ jobs, contacts }) {
       </div>
 
       {jobs.filter(j => !["Offer","Rejected","Withdrew"].includes(j.status) && daysDiff(j.followUp) <= 0).length > 0 && (
-        <div style={{ background:"#1E293B", border:"1px solid #F87171", borderRadius:12, padding:20, marginTop:16 }}>
-          <div style={{ fontFamily:"'Syne', sans-serif", fontWeight:800, fontSize:14, color:"#F87171", marginBottom:12 }}>⚠️ Overdue Application Follow-Ups</div>
+        <div style={{ background:"#1E293B", border:"1px solid #F87171", borderRadius:14, padding:24, marginTop:18 }}>
+          <div style={{ fontFamily:"'Syne', sans-serif", fontWeight:800, fontSize:16, color:"#F87171", marginBottom:14 }}>⚠️ Overdue Application Follow-Ups</div>
           {jobs.filter(j => !["Offer","Rejected","Withdrew"].includes(j.status) && daysDiff(j.followUp) <= 0).map(j => (
-            <div key={j.id} style={{ display:"flex", justifyContent:"space-between", padding:"8px 0", borderBottom:"1px solid #0F172A", fontSize:13, flexWrap:"wrap", gap:4 }}>
+            <div key={j.id} style={{ display:"flex", justifyContent:"space-between", padding:"10px 0", borderBottom:"1px solid #0F172A", fontSize:14, flexWrap:"wrap", gap:6 }}>
               <span style={{ color:"#E2E8F0" }}>{j.company} — {j.role}</span>
               <span style={{ color:"#F87171" }}>{Math.abs(daysDiff(j.followUp))}d overdue</span>
             </div>
@@ -846,10 +1127,10 @@ function Dashboard({ jobs, contacts }) {
       )}
 
       {contacts.filter(c => !["Meeting Done", "No Response"].includes(c.status) && daysDiff(c.followUp) <= 0).length > 0 && (
-        <div style={{ background:"#1E293B", border:"1px solid #A78BFA", borderRadius:12, padding:20, marginTop:16 }}>
-          <div style={{ fontFamily:"'Syne', sans-serif", fontWeight:800, fontSize:14, color:"#A78BFA", marginBottom:12 }}>👥 Overdue Contact Follow-Ups</div>
+        <div style={{ background:"#1E293B", border:"1px solid #A78BFA", borderRadius:14, padding:24, marginTop:18 }}>
+          <div style={{ fontFamily:"'Syne', sans-serif", fontWeight:800, fontSize:16, color:"#A78BFA", marginBottom:14 }}>👥 Overdue Contact Follow-Ups</div>
           {contacts.filter(c => !["Meeting Done", "No Response"].includes(c.status) && daysDiff(c.followUp) <= 0).map(c => (
-            <div key={c.id} style={{ display:"flex", justifyContent:"space-between", padding:"8px 0", borderBottom:"1px solid #0F172A", fontSize:13, flexWrap:"wrap", gap:4 }}>
+            <div key={c.id} style={{ display:"flex", justifyContent:"space-between", padding:"10px 0", borderBottom:"1px solid #0F172A", fontSize:14, flexWrap:"wrap", gap:6 }}>
               <span style={{ color:"#E2E8F0" }}>{c.name} @ {c.company}</span>
               <span style={{ color:"#A78BFA" }}>{Math.abs(daysDiff(c.followUp))}d overdue</span>
             </div>
