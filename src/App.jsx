@@ -3,6 +3,7 @@ import { supabase, jobToDb, dbToJob, contactToDb, dbToContact } from "./supabase
 import FollowUpCards from "./FollowUpCards";
 import Settings from "./Settings";
 import { openEmailClient, downloadAttachments, getUpdatedContactData } from "./emailService";
+import { isGmailConnected, sendEmailViaGmail } from "./gmailBackendService";
 
 const STATUS_OPTIONS = ["Applied","Phone Screen","Technical Round","Take-Home","Onsite / Final","Offer","Rejected","No Response","Withdrew"];
 const METHOD_OPTIONS = ["Cold Apply","Referral","Alumni Network","Recruiter Outreach","Work at a Startup","Handshake","LinkedIn","Career Fair","Other"];
@@ -474,19 +475,33 @@ export default function App() {
   };
 
   // ── Follow-up Email Handlers ──────────────────────────────────────────────
-  const handleSendFollowUp = async (contact, emailBody, attachmentFiles) => {
+  const handleSendFollowUp = async (contact, emailBody, attachmentFiles, previousEmail) => {
     setError(null);
     try {
-      // Open email in default client
-      const result = openEmailClient(contact, emailBody, attachmentFiles);
+      // Check if Gmail is connected
+      const gmailEnabled = isGmailConnected();
 
-      if (result.warning) {
-        alert(result.warning);
-      }
+      if (gmailEnabled) {
+        // Send via Gmail API
+        if (attachmentFiles && attachmentFiles.length > 0) {
+          alert('⚠️ Gmail API doesn\'t support attachments yet. They will be downloaded separately.');
+          downloadAttachments(attachmentFiles);
+        }
 
-      // Download attachments if any
-      if (attachmentFiles.length > 0) {
-        downloadAttachments(attachmentFiles);
+        await sendEmailViaGmail(contact, emailBody, previousEmail);
+        alert('✅ Email sent via Gmail!');
+      } else {
+        // Fall back to opening email client (mailto:)
+        const result = openEmailClient(contact, emailBody, attachmentFiles);
+
+        if (result.warning) {
+          alert(result.warning);
+        }
+
+        // Download attachments if any
+        if (attachmentFiles && attachmentFiles.length > 0) {
+          downloadAttachments(attachmentFiles);
+        }
       }
 
       // Update contact in database

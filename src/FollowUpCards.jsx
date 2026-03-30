@@ -21,6 +21,7 @@ export default function FollowUpCards({ contacts, onSend, onSkip, onUpdateContac
   const [generatedEmails, setGeneratedEmails] = useState({});
   const [editedEmails, setEditedEmails] = useState({});
   const [attachments, setAttachments] = useState({});
+  const [previousEmails, setPreviousEmails] = useState({}); // Store previous emails for threading
 
   // New: Selection screen
   const [showSelection, setShowSelection] = useState(true);
@@ -53,6 +54,7 @@ export default function FollowUpCards({ contacts, onSend, onSkip, onUpdateContac
 
       const gmailEnabled = isGmailConnected();
       const emails = {};
+      const prevEmails = {}; // Store previous emails for threading
 
       // Generate one by one with progress
       for (let i = 0; i < contactsToGenerate.length; i++) {
@@ -64,6 +66,9 @@ export default function FollowUpCards({ contacts, onSend, onSkip, onUpdateContac
           if (gmailEnabled && contact.email) {
             try {
               previousEmail = await findPreviousEmail(contact.email);
+              if (previousEmail) {
+                prevEmails[contact.id] = previousEmail; // Store for threading
+              }
             } catch (gmailErr) {
               console.warn(`Couldn't fetch Gmail for ${contact.email}:`, gmailErr);
               // Continue with notes only
@@ -84,6 +89,7 @@ export default function FollowUpCards({ contacts, onSend, onSkip, onUpdateContac
       }
 
       setGeneratedEmails(emails);
+      setPreviousEmails(prevEmails); // Store for threading when sending
       setShowSelection(false); // Go to cards view
     } catch (err) {
       setError(err.message);
@@ -139,9 +145,10 @@ export default function FollowUpCards({ contacts, onSend, onSkip, onUpdateContac
     try {
       const emailBody = editedEmails[currentContact.id] || generatedEmails[currentContact.id];
       const files = attachments[currentContact.id] || [];
+      const previousEmail = previousEmails[currentContact.id]; // Get previous email for threading
 
       // Call parent send function
-      await onSend(currentContact, emailBody, files);
+      await onSend(currentContact, emailBody, files, previousEmail);
 
       // Move to next card
       handleNext();
