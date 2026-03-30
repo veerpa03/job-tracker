@@ -18,19 +18,44 @@ export default async function handler(req, res) {
   }
 
   try {
+    console.log('[Callback] Starting OAuth callback');
+    console.log('[Callback] Has CLIENT_ID:', !!process.env.VITE_GOOGLE_CLIENT_ID);
+    console.log('[Callback] Has CLIENT_SECRET:', !!process.env.GOOGLE_CLIENT_SECRET);
+
     // Exchange code for tokens
+    console.log('[Callback] Exchanging code for tokens...');
     const tokens = await getTokensFromCode(code);
+    console.log('[Callback] Tokens received:', {
+      hasAccessToken: !!tokens.access_token,
+      hasRefreshToken: !!tokens.refresh_token,
+      expiryDate: tokens.expiry_date
+    });
 
-    // Get user's email from Google
-    const oauth2Client = getOAuth2Client();
-    oauth2Client.setCredentials(tokens);
+    // Get user's email from ID token (simpler than API call)
+    console.log('[Callback] Extracting email from tokens...');
+    let userEmail;
 
-    const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
-    const { data } = await oauth2.userinfo.get();
-    const userEmail = data.email;
+    if (tokens.id_token) {
+      // Decode ID token to get email (it's a JWT)
+      const base64Payload = tokens.id_token.split('.')[1];
+      const payload = JSON.parse(Buffer.from(base64Payload, 'base64').toString());
+      userEmail = payload.email;
+      console.log('[Callback] Email from ID token:', userEmail);
+    } else {
+      // Fallback to userinfo API
+      console.log('[Callback] No ID token, using userinfo API...');
+      const oauth2Client = getOAuth2Client();
+      oauth2Client.setCredentials(tokens);
+      const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
+      const { data } = await oauth2.userinfo.get();
+      userEmail = data.email;
+      console.log('[Callback] Email from userinfo:', userEmail);
+    }
 
     // Save tokens to Supabase
+    console.log('[Callback] Saving tokens to Supabase...');
     await saveTokens(userEmail, tokens);
+    console.log('[Callback] Tokens saved successfully');
 
     // Return HTML that sets localStorage and closes window
     res.setHeader('Content-Type', 'text/html');
