@@ -4,7 +4,7 @@
 
 import { useState, useEffect } from "react";
 import { generateFollowUpEmail, getApiKey } from "./aiService";
-import { isGmailConnected, findPreviousEmail } from "./gmailService";
+import { isGmailConnected, findPreviousEmail } from "./gmailBackendService";
 
 function daysSince(dateStr) {
   if (!dateStr) return 0;

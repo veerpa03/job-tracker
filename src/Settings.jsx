@@ -12,13 +12,11 @@ import {
   DEFAULT_PROMPT_TEMPLATE
 } from "./aiService";
 import {
-  getGoogleClientId,
-  saveGoogleClientId,
   isGmailConnected,
   signInWithGoogle,
   signOutFromGoogle,
   getCurrentUserEmail
-} from "./gmailService";
+} from "./gmailBackendService";
 
 export default function Settings() {
   const [apiKey, setApiKey] = useState("");
@@ -28,7 +26,6 @@ export default function Settings() {
   const [saved, setSaved] = useState(false);
 
   // Gmail connection state
-  const [googleClientId, setGoogleClientId] = useState("");
   const [gmailConnected, setGmailConnected] = useState(false);
   const [gmailEmail, setGmailEmail] = useState("");
   const [gmailLoading, setGmailLoading] = useState(false);
@@ -38,7 +35,6 @@ export default function Settings() {
     setApiKey(getApiKey());
     setPromptTemplate(getPromptTemplate());
     setEmailSignature(localStorage.getItem("email_signature") || "");
-    setGoogleClientId(getGoogleClientId());
     setGmailConnected(isGmailConnected());
     setGmailEmail(getCurrentUserEmail() || "");
   }, []);
@@ -47,7 +43,6 @@ export default function Settings() {
     saveApiKey(apiKey);
     savePromptTemplate(promptTemplate);
     localStorage.setItem("email_signature", emailSignature);
-    saveGoogleClientId(googleClientId);
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
   };
@@ -248,33 +243,8 @@ export default function Settings() {
         </h3>
 
         <p style={{ color: "#94A3B8", fontSize: 13, marginBottom: 16, lineHeight: 1.6 }}>
-          Connect Gmail to automatically read your previous emails for better AI context
+          Connect Gmail to automatically read your previous emails and send emails directly
         </p>
-
-        {/* Google Client ID Input */}
-        {!gmailConnected && (
-          <div style={{ marginBottom: 16 }}>
-            <label style={labelStyle}>Google Client ID</label>
-            <input
-              type="text"
-              value={googleClientId}
-              onChange={(e) => setGoogleClientId(e.target.value)}
-              placeholder="xxxx.apps.googleusercontent.com"
-              style={inputStyle}
-            />
-            <div style={{
-              marginTop: 8,
-              fontSize: 11,
-              color: "#64748B"
-            }}>
-              Don't have one? See{" "}
-              <code style={{ background: "#0F172A", padding: "2px 6px", borderRadius: 4 }}>
-                GMAIL_API_SETUP.md
-              </code>
-              {" "}for setup instructions (20 min)
-            </div>
-          </div>
-        )}
 
         {gmailError && (
           <div style={{
@@ -344,20 +314,18 @@ export default function Settings() {
           ) : (
             <button
               onClick={handleGmailConnect}
-              disabled={gmailLoading || !googleClientId}
+              disabled={gmailLoading}
               style={{
-                background: googleClientId
-                  ? "linear-gradient(135deg, #059669, #0284C7)"
-                  : "#334155",
+                background: "linear-gradient(135deg, #059669, #0284C7)",
                 border: "none",
                 color: "#fff",
                 borderRadius: 8,
                 padding: "10px 20px",
-                cursor: gmailLoading || !googleClientId ? "not-allowed" : "pointer",
+                cursor: gmailLoading ? "not-allowed" : "pointer",
                 fontSize: 14,
                 fontWeight: 700,
                 fontFamily: "'Syne', sans-serif",
-                opacity: gmailLoading || !googleClientId ? 0.5 : 1
+                opacity: gmailLoading ? 0.5 : 1
               }}
             >
               {gmailLoading ? "Connecting..." : "Connect Gmail"}
